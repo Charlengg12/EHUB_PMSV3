@@ -13,7 +13,10 @@
     "backend:start": "cd backend && npm start",
     "backend:dev": "cd backend && npm run dev",
     "setup": "npm run backend:install && npm run backend:setup",
-    "start:full": "concurrently \"npm run backend:start\" \"npm run dev\""
+    "start:full": "concurrently \"npm run backend:start\" \"npm run dev\"",
+    "network:config": "node scripts/get-local-ip.js",
+    "network:setup": "npm run network:config && npm run setup",
+    "deploy:build": "npm run build && cd backend && npm install --production"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

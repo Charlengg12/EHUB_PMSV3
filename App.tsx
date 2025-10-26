@@ -16,13 +16,14 @@ import { TaskManager } from './components/tasks/TaskManager';
 import { ReportsManager } from './components/reports/ReportsManager';
 import { ProjectArchives } from './components/archives/ProjectArchives';
 import { ClientDashboard } from './components/client/ClientDashboard';
+import { AnimationExamples } from './components/ui/AnimationExamples';
 import { User, Task, Project, WorkLogEntry, Material, ProjectAssignment } from './types';
 import { mockUsers, mockProjects, mockTasks, mockCompanyRevenue, mockWorkLogs, mockMaterials } from './data/mockData';
 import { emailService } from './utils/emailService';
 import { apiService } from './utils/apiService';
 import { useTimeBasedTheme } from './hooks/useTimeBasedTheme';
 
-type ViewType = 'dashboard' | 'projects' | 'tasks' | 'users' | 'materials' | 'reports' | 'settings' | 'team' | 'worklog' | 'revenue' | 'assignments' | 'archives' | 'project-status' | 'documentation';
+type ViewType = 'dashboard' | 'projects' | 'tasks' | 'users' | 'materials' | 'reports' | 'settings' | 'team' | 'worklog' | 'revenue' | 'assignments' | 'archives' | 'project-status' | 'documentation' | 'animations';
 type AuthView = 'main' | 'fabricator-signup' | 'forgot-password';
 
 export default function App() {
@@ -342,7 +343,7 @@ export default function App() {
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1) as ViewType;
-      if (hash && ['dashboard', 'projects', 'tasks', 'users', 'materials', 'reports', 'settings', 'team', 'worklog', 'revenue', 'assignments', 'archives', 'project-status', 'documentation'].includes(hash)) {
+      if (hash && ['dashboard', 'projects', 'tasks', 'users', 'materials', 'reports', 'settings', 'team', 'worklog', 'revenue', 'assignments', 'archives', 'project-status', 'documentation', 'animations'].includes(hash)) {
         setCurrentView(hash);
       }
     };
@@ -577,6 +578,9 @@ export default function App() {
             onDeleteTask={handleDeleteTask}
           />
         );
+
+      case 'animations':
+        return <AnimationExamples />;
 
       default:
         return (

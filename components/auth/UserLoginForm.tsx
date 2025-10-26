@@ -27,6 +27,7 @@ import {
 import { User } from "../../types";
 import { mockUsers } from "../../data/mockData";
 import { CompanyLogo } from "../ui/company-logo";
+import { apiService } from "../../utils/apiService";
 
 interface UserLoginFormProps {
   onLogin: (user: User) => void;
@@ -87,26 +88,51 @@ export function UserLoginForm({
     setIsLoading((prev) => ({ ...prev, [role]: true }));
     setErrors((prev) => ({ ...prev, [role]: "" }));
 
-    // Simulate loading delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      // Try API login first
+      const response = await apiService.login(data.email, data.password);
 
-    const user = mockUsers.find(
-      (u) =>
-        u.role === role &&
-        u.email === data.email &&
-        u.password === data.password,
-    );
+      if (response.data) {
+        // Set the token in the API service
+        if (response.data.token) {
+          apiService.setToken(response.data.token);
+        }
+        onLogin(response.data.user);
+      } else {
+        // If API fails, try demo mode as fallback
+        const user = mockUsers.find(
+          (u) =>
+            u.role === role &&
+            u.email === data.email &&
+            u.password === data.password,
+        );
 
-    if (user) {
-      onLogin(user);
-    } else {
-      setErrors((prev) => ({
-        ...prev,
-        [role]: "Invalid email or password",
-      }));
+        if (user) {
+          onLogin(user);
+        } else {
+          throw new Error(response.error || 'Login failed');
+        }
+      }
+    } catch (err) {
+      // If API is completely unavailable, try demo mode
+      const user = mockUsers.find(
+        (u) =>
+          u.role === role &&
+          u.email === data.email &&
+          u.password === data.password,
+      );
+
+      if (user) {
+        onLogin(user);
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          [role]: err instanceof Error ? err.message : "Invalid email or password",
+        }));
+      }
+    } finally {
+      setIsLoading((prev) => ({ ...prev, [role]: false }));
     }
-
-    setIsLoading((prev) => ({ ...prev, [role]: false }));
   };
 
   const togglePasswordVisibility = (
@@ -130,11 +156,13 @@ export function UserLoginForm({
     <div className="min-h-screen flex items-center justify-center bg-primary relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl floating"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl floating-delayed"></div>
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-primary/5 rounded-full blur-2xl floating"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-secondary/5 rounded-full blur-2xl floating-delayed"></div>
       </div>
-      
-      <Card className="w-full max-w-md relative z-10 shadow-2xl border-0">
+
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-0 hover-lift hover-glow animate-fade-in">
         <CardHeader className="text-center space-y-4 pb-8">
           <div className="flex items-center justify-center mb-4">
             <CompanyLogo size="xl" showText={false} />

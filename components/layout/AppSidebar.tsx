@@ -21,7 +21,8 @@ import {
   DollarSign,
   Archive,
   Eye,
-  Download
+  Download,
+  Zap
 } from 'lucide-react';
 import { User } from '../../types';
 
@@ -42,6 +43,11 @@ export function AppSidebar({ currentUser }: AppSidebarProps) {
         title: 'Projects',
         url: '#projects',
         icon: FolderOpen,
+      },
+      {
+        title: 'Animations',
+        url: '#animations',
+        icon: Zap,
       },
     ];
 

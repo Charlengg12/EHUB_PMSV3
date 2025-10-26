@@ -9,11 +9,34 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Security middleware
 app.use(helmet());
+// CORS configuration for network access
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            // Allow local network access (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+            const isLocalNetwork = /^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(origin);
+            if (isLocalNetwork) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        }
+    },
     credentials: true
 }));
 
@@ -154,13 +177,14 @@ async function initializeDatabase() {
       )
     `);
 
-        // Create default admin user if not exists
+        // Create default admin users if not exists
         const [adminUsers] = await connection.execute(
             'SELECT * FROM users WHERE role = ?',
             ['admin']
         );
 
         if (adminUsers.length === 0) {
+            // Create original admin user
             const adminPassword = await bcrypt.hash('admin123', 10);
             await connection.execute(`
         INSERT INTO users (id, name, email, password_hash, role, secure_id, employee_number, is_active)
@@ -173,6 +197,80 @@ async function initializeDatabase() {
                 'admin',
                 'ADM001',
                 'EMP001',
+                true
+            ]);
+        }
+
+        // Always ensure the new admin user with admin@ehub.ph exists
+        const [newAdminUsers] = await connection.execute(
+            'SELECT * FROM users WHERE email = ?',
+            ['admin@ehub.ph']
+        );
+
+        if (newAdminUsers.length === 0) {
+            const newAdminPassword = await bcrypt.hash('administrator', 10);
+            await connection.execute(`
+        INSERT INTO users (id, name, email, password_hash, role, secure_id, employee_number, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+                'admin-2',
+                'Ehub Administrator',
+                'admin@ehub.ph',
+                newAdminPassword,
+                'admin',
+                'ADM002',
+                'EMP002',
+                true
+            ]);
+        }
+
+        // Create sample supervisor and fabricator users
+        const [supervisorUsers] = await connection.execute(
+            'SELECT * FROM users WHERE role = ?',
+            ['supervisor']
+        );
+
+        if (supervisorUsers.length === 0) {
+            const supervisorPassword = await bcrypt.hash('supervisor123', 10);
+            await connection.execute(`
+        INSERT INTO users (id, name, email, password_hash, role, school, phone, gcash_number, secure_id, employee_number, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+                'supervisor-1',
+                'John Supervisor',
+                'supervisor@ehub.ph',
+                supervisorPassword,
+                'supervisor',
+                'Ehub University',
+                '+63 987 654 3210',
+                '09987654321',
+                'SUP001',
+                'EMP003',
+                true
+            ]);
+        }
+
+        const [fabricatorUsers] = await connection.execute(
+            'SELECT * FROM users WHERE role = ?',
+            ['fabricator']
+        );
+
+        if (fabricatorUsers.length === 0) {
+            const fabricatorPassword = await bcrypt.hash('fabricator123', 10);
+            await connection.execute(`
+        INSERT INTO users (id, name, email, password_hash, role, school, phone, gcash_number, secure_id, employee_number, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+                'fabricator-1',
+                'Jane Fabricator',
+                'fabricator@ehub.ph',
+                fabricatorPassword,
+                'fabricator',
+                'Ehub University',
+                '+63 912 345 6789',
+                '09123456789',
+                'FAB001',
+                'EMP004',
                 true
             ]);
         }
@@ -250,24 +348,36 @@ app.post('/api/auth/login', async (req, res) => {
 
         const connection = await pool.getConnection();
 
-        // Check for admin login
-        if (identifier === 'admin' && password === 'admin123') {
-            const [adminUsers] = await connection.execute(
-                'SELECT * FROM users WHERE role = ? AND is_active = ?',
-                ['admin', true]
-            );
+        // Check for admin login with hardcoded credentials
+        if ((identifier === 'admin' && password === 'admin123') ||
+            (identifier === 'admin@ehub.ph' && password === 'administrator')) {
 
-            if (adminUsers.length > 0) {
-                const user = adminUsers[0];
+            // Find the specific admin user based on identifier
+            let adminUser;
+            if (identifier === 'admin@ehub.ph') {
+                const [users] = await connection.execute(
+                    'SELECT * FROM users WHERE email = ? AND role = ? AND is_active = ?',
+                    ['admin@ehub.ph', 'admin', true]
+                );
+                adminUser = users[0];
+            } else {
+                const [users] = await connection.execute(
+                    'SELECT * FROM users WHERE role = ? AND is_active = ?',
+                    ['admin', true]
+                );
+                adminUser = users[0];
+            }
+
+            if (adminUser) {
                 const token = jwt.sign(
-                    { id: user.id, role: user.role, email: user.email },
+                    { id: adminUser.id, role: adminUser.role, email: adminUser.email },
                     JWT_SECRET,
                     { expiresIn: '24h' }
                 );
 
                 connection.release();
                 return res.json({
-                    user: { ...user, password_hash: undefined },
+                    user: { ...adminUser, password_hash: undefined },
                     token
                 });
             }
@@ -640,9 +750,11 @@ app.post('/api/users/client', authenticateToken, async (req, res) => {
 
 // Initialize database and start server
 initializeDatabase().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`Health check: http://localhost:${PORT}/api/health`);
+    app.listen(PORT, HOST, () => {
+        console.log(`🚀 Server running on ${HOST}:${PORT}`);
+        console.log(`🌐 Network access: http://${HOST}:${PORT}`);
+        console.log(`🏥 Health check: http://${HOST}:${PORT}/api/health`);
+        console.log(`📱 Access from other devices: http://[YOUR_LOCAL_IP]:${PORT}`);
     });
 }).catch(error => {
     console.error('Failed to start server:', error);

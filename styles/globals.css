@@ -128,9 +128,9 @@
   }
 
   body {
-    background: linear-gradient(270deg, #103054, #E1862D, #1a4572, #F5F7FA);
-    background-size: 800% 800%;
-    animation: gradientAnimation 15s ease infinite;
+    background: linear-gradient(270deg, #103054, #E1862D, #1a4572, #F5F7FA, #103054, #E1862D);
+    background-size: 400% 400%;
+    animation: gradientAnimation 20s ease infinite;
     transition: background-color 0.5s ease, color 0.5s ease;
     font-family: 'Archivo Black', sans-serif;
     @apply bg-background text-foreground;
@@ -224,11 +224,147 @@ html {
     background-position: 0% 50%;
   }
 
-  50% {
+  25% {
     background-position: 100% 50%;
+  }
+
+  50% {
+    background-position: 100% 100%;
+  }
+
+  75% {
+    background-position: 0% 100%;
   }
 
   100% {
     background-position: 0% 50%;
   }
+}
+
+/* Enhanced hover animations */
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.hover-glow {
+  transition: all 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(225, 134, 45, 0.4);
+}
+
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.hover-rotate {
+  transition: transform 0.3s ease;
+}
+
+.hover-rotate:hover {
+  transform: rotate(2deg);
+}
+
+.hover-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.hover-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.hover-shimmer:hover::before {
+  left: 100%;
+}
+
+/* Animated gradient backgrounds for cards */
+.gradient-card {
+  background: linear-gradient(135deg, #103054, #1a4572, #E1862D);
+  background-size: 200% 200%;
+  animation: gradient 8s ease infinite;
+}
+
+.gradient-card-fast {
+  background: linear-gradient(135deg, #E1862D, #103054, #1a4572);
+  background-size: 200% 200%;
+  animation: gradient 4s ease infinite;
+}
+
+/* Floating elements */
+.floating {
+  animation: float 6s ease-in-out infinite;
+}
+
+.floating-delayed {
+  animation: float 6s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+/* Pulse effects */
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(225, 134, 45, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(225, 134, 45, 0.6);
+  }
+}
+
+/* Shimmer effect */
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Interactive button effects */
+.btn-interactive {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.btn-interactive::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-interactive:hover::before {
+  left: 100%;
+}
+
+.btn-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
 }

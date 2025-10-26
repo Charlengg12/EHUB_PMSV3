@@ -20,6 +20,7 @@ import {
 import { User } from "../../types";
 import { mockUsers } from "../../data/mockData";
 import { CompanyLogo } from "../ui/company-logo";
+import { apiService } from "../../utils/apiService";
 
 interface AdminLoginFormProps {
   onLogin: (user: User) => void;
@@ -48,29 +49,53 @@ export function AdminLoginForm({
     setIsLoading(true);
     setError("");
 
-    // Simulate loading delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      // Try API login first
+      const response = await apiService.login(formData.username, formData.password);
 
-    const adminUser = mockUsers.find(user => user.role === 'admin');
-    
-    if (adminUser && formData.username === "admin" && formData.password === "admin123") {
-      onLogin(adminUser);
-    } else {
-      setError("Invalid username or password");
+      if (response.data) {
+        // Set the token in the API service
+        if (response.data.token) {
+          apiService.setToken(response.data.token);
+        }
+        onLogin(response.data.user);
+      } else {
+        // If API fails, try demo mode as fallback
+        if (formData.username === "admin" && formData.password === "admin123") {
+          const demoAdminUser = mockUsers.find(user => user.role === 'admin');
+          if (demoAdminUser) {
+            onLogin(demoAdminUser);
+            return;
+          }
+        }
+        throw new Error(response.error || 'Login failed');
+      }
+    } catch (err) {
+      // If API is completely unavailable, try demo mode
+      if (formData.username === "admin" && formData.password === "admin123") {
+        const demoAdminUser = mockUsers.find(user => user.role === 'admin');
+        if (demoAdminUser) {
+          onLogin(demoAdminUser);
+          return;
+        }
+      }
+      setError(err instanceof Error ? err.message : 'Login failed');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-primary relative overflow-hidden">
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl floating"></div>
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl floating-delayed"></div>
+        <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-primary/5 rounded-full blur-2xl floating"></div>
+        <div className="absolute bottom-1/3 left-1/3 w-80 h-80 bg-secondary/5 rounded-full blur-2xl floating-delayed"></div>
       </div>
-      
-      <Card className="w-full max-w-md relative z-10 shadow-2xl border-0">
+
+      <Card className="w-full max-w-md relative z-10 shadow-2xl border-0 hover-lift hover-glow animate-fade-in">
         <CardHeader className="text-center space-y-4 pb-8">
           <div className="flex items-center justify-center mb-4">
             <CompanyLogo size="xl" />
@@ -144,7 +169,7 @@ export function AdminLoginForm({
             <div className="space-y-3">
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full btn-interactive hover-scale"
                 variant="destructive"
                 disabled={isLoading}
               >
@@ -165,7 +190,7 @@ export function AdminLoginForm({
                 type="button"
                 variant="outline"
                 onClick={onBackToMain}
-                className="w-full"
+                className="w-full hover-lift hover-glow"
                 disabled={isLoading}
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
