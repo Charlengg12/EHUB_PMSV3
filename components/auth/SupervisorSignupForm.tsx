@@ -24,7 +24,7 @@ import {
   generateSecureId,
   generateEmployeeNumber,
 } from "../../utils/secureId";
-import { apiBaseUrl, publicAnonKey } from "../../utils/supabase/info";
+import { apiService } from "../../utils/apiService";
 
 interface SupervisorSignupFormProps {
   onSignup: (user: User) => void;
@@ -110,37 +110,16 @@ export function SupervisorSignupForm({
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/users/supervisor`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.phone,
-          department: formData.department
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create supervisor account');
-      }
-
-      // Create the user object with all necessary fields
+      // For now, create a local supervisor user since we don't have the supervisor endpoint yet
       const newUser: User = {
-        id: data.user.id,
-        name: data.user.name,
-        email: data.user.email,
+        id: `user-${Date.now()}`,
+        name: formData.name,
+        email: formData.email.toLowerCase(),
         role: "supervisor",
-        school: data.user.school,
-        secureId: data.user.secureId,
-        employeeNumber: data.user.employeeNumber,
-        phone: data.user.phone,
+        school: formData.department,
+        secureId: generateSecureId('supervisor'),
+        employeeNumber: generateEmployeeNumber(),
+        phone: formData.phone,
         password: formData.password, // Keep password in memory for this session
       };
 

@@ -4,10 +4,10 @@ import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
-import { Calendar, DollarSign, Users, Building, FileText, Link, Paperclip, Plus, UserPlus, Edit, CheckCircle } from 'lucide-react';
+import { Calendar, DollarSign, Users, Building, FileText, Link, Paperclip, Plus, UserPlus, CheckCircle } from 'lucide-react';
 import { Project, User } from '../../types';
 import { CreateProjectForm } from './CreateProjectForm';
 import { ProjectDetails } from './ProjectDetails';
@@ -33,13 +33,18 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
   const [showProjectDetails, setShowProjectDetails] = useState(false);
 
   const getFilteredProjects = () => {
+    // First filter by role-based access
+    let roleFilteredProjects;
     if (currentUser.role === 'admin') {
-      return projects;
+      roleFilteredProjects = projects;
+    } else if (currentUser.role === 'supervisor') {
+      roleFilteredProjects = projects.filter(p => p.supervisorId === currentUser.id);
+    } else {
+      roleFilteredProjects = projects.filter(p => p.fabricatorIds.includes(currentUser.id));
     }
-    if (currentUser.role === 'supervisor') {
-      return projects.filter(p => p.supervisorId === currentUser.id);
-    }
-    return projects.filter(p => p.fabricatorIds.includes(currentUser.id));
+
+    // Then filter out completed projects (they should only appear in archives)
+    return roleFilteredProjects.filter(p => p.status !== 'completed');
   };
 
   const filteredProjects = getFilteredProjects();
@@ -48,9 +53,9 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
   const getAvailableFabricators = (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
     if (!project) return [];
-    
-    return users.filter(u => 
-      u.role === 'fabricator' && 
+
+    return users.filter(u =>
+      u.role === 'fabricator' &&
       !project.fabricatorIds.includes(u.id) &&
       !project.pendingAssignments?.some(pa => pa.fabricatorId === u.id && pa.status === 'pending')
     );
@@ -174,7 +179,7 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
           </Button>
         )}
       </div>
-      
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredProjects.map((project) => (
           <Card key={project.id} className="hover:shadow-lg transition-all duration-200 border-0 shadow-md overflow-hidden group">
@@ -196,7 +201,7 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
               <p className="text-sm text-muted-foreground">
                 {project.description}
               </p>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
                   <span>Progress</span>
@@ -220,7 +225,7 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                     {new Date(project.endDate).toLocaleDateString()}
                   </span>
                 </div>
-                
+
                 {/* Role-based financial information */}
                 {currentUser.role === 'fabricator' && (
                   <div className="space-y-1">
@@ -353,29 +358,29 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
               </div>
 
               <div className="flex gap-2 flex-wrap">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="flex-1"
                   onClick={() => handleViewDetails(project)}
                 >
                   View Details
                 </Button>
-                {(currentUser.role === 'admin' || 
+                {(currentUser.role === 'admin' ||
                   (currentUser.role === 'supervisor' && project.supervisorId === currentUser.id) ||
                   (currentUser.role === 'fabricator' && project.createdBy === currentUser.id)) && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => handleViewDetails(project)}
-                  >
-                    Edit
-                  </Button>
-                )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewDetails(project)}
+                    >
+                      Edit
+                    </Button>
+                  )}
                 {currentUser.role === 'supervisor' && project.supervisorId === currentUser.id && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       setSelectedProjectId(project.id);
                       setShowAssignForm(true);
@@ -386,18 +391,18 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                   </Button>
                 )}
                 {/* Mark as Done Button */}
-                {(currentUser.role === 'admin' || currentUser.role === 'supervisor') && 
-                 project.status !== 'completed' && (
-                  <Button 
-                    variant="default" 
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => handleMarkProjectAsDone(project)}
-                  >
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Mark as Done
-                  </Button>
-                )}
+                {(currentUser.role === 'admin' || currentUser.role === 'supervisor') &&
+                  project.status !== 'completed' && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => handleMarkProjectAsDone(project)}
+                    >
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Mark as Done
+                    </Button>
+                  )}
               </div>
             </CardContent>
           </Card>
@@ -410,11 +415,11 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
             <div className="text-center">
               <h3 className="text-lg mb-2">No projects found</h3>
               <p className="text-muted-foreground mb-4">
-                {currentUser.role === 'admin' 
+                {currentUser.role === 'admin'
                   ? 'Create your first project to get started.'
                   : currentUser.role === 'supervisor'
-                  ? 'Create your first project to get started.'
-                  : 'Wait for project assignments from your supervisor.'
+                    ? 'Create your first project to get started.'
+                    : 'Wait for project assignments from your supervisor.'
                 }
               </p>
               {canCreateProject && (
@@ -432,8 +437,10 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
         <CreateProjectForm
           currentUser={currentUser}
           users={users}
-          onCreateProject={handleCreateProject}
-          onClientCreated={onCreateUser || (() => {})}
+          onCreateProject={async (project) => {
+            await handleCreateProject(project);
+          }}
+          onClientCreated={onCreateUser || (() => { })}
           onClose={() => setShowCreateForm(false)}
         />
       )}
@@ -476,13 +483,13 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
               </div>
 
               <div className="flex gap-2 justify-end">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setShowAssignForm(false)}
                 >
                   Cancel
                 </Button>
-                <Button 
+                <Button
                   onClick={handleAssignFabricator}
                   disabled={!selectedFabricatorId}
                 >

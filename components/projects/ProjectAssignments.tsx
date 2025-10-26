@@ -4,13 +4,12 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
-import { Alert, AlertDescription } from '../ui/alert';
-import { 
-  UserCheck, 
-  UserX, 
-  Clock, 
-  MessageSquare, 
-  CheckCircle, 
+import {
+  UserCheck,
+  UserX,
+  Clock,
+  MessageSquare,
+  CheckCircle,
   XCircle,
   AlertCircle,
   Calendar
@@ -25,9 +24,9 @@ interface ProjectAssignmentsProps {
   onDeclineAssignment: (assignmentId: string, response?: string) => void;
 }
 
-export function ProjectAssignments({ 
-  currentUser, 
-  projects, 
+export function ProjectAssignments({
+  currentUser,
+  projects,
   users,
   onAcceptAssignment,
   onDeclineAssignment
@@ -37,14 +36,14 @@ export function ProjectAssignments({
 
   // Get pending assignments for current fabricator
   const pendingAssignments = projects
-    .filter(project => 
-      project.pendingAssignments?.some(assignment => 
+    .filter(project =>
+      project.pendingAssignments?.some(assignment =>
         assignment.fabricatorId === currentUser.id && assignment.status === 'pending'
       )
     )
-    .flatMap(project => 
+    .flatMap(project =>
       project.pendingAssignments
-        ?.filter(assignment => 
+        ?.filter(assignment =>
           assignment.fabricatorId === currentUser.id && assignment.status === 'pending'
         )
         .map(assignment => ({ ...assignment, project })) || []
@@ -52,14 +51,14 @@ export function ProjectAssignments({
 
   // Get assignment history
   const assignmentHistory = projects
-    .filter(project => 
-      project.pendingAssignments?.some(assignment => 
+    .filter(project =>
+      project.pendingAssignments?.some(assignment =>
         assignment.fabricatorId === currentUser.id && assignment.status !== 'pending'
       )
     )
-    .flatMap(project => 
+    .flatMap(project =>
       project.pendingAssignments
-        ?.filter(assignment => 
+        ?.filter(assignment =>
           assignment.fabricatorId === currentUser.id && assignment.status !== 'pending'
         )
         .map(assignment => ({ ...assignment, project })) || []
@@ -201,14 +200,14 @@ export function ProjectAssignments({
                   <div className="flex gap-2">
                     {selectedAssignment === assignment.id ? (
                       <>
-                        <Button 
+                        <Button
                           onClick={() => handleAccept(assignment.id)}
                           size="sm"
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Confirm Accept
                         </Button>
-                        <Button 
+                        <Button
                           variant="destructive"
                           onClick={() => handleDecline(assignment.id)}
                           size="sm"
@@ -216,7 +215,7 @@ export function ProjectAssignments({
                           <XCircle className="h-4 w-4 mr-2" />
                           Confirm Decline
                         </Button>
-                        <Button 
+                        <Button
                           variant="ghost"
                           onClick={() => {
                             setSelectedAssignment(null);
@@ -229,14 +228,14 @@ export function ProjectAssignments({
                       </>
                     ) : (
                       <>
-                        <Button 
+                        <Button
                           onClick={() => setSelectedAssignment(assignment.id)}
                           size="sm"
                         >
                           <UserCheck className="h-4 w-4 mr-2" />
                           Accept Assignment
                         </Button>
-                        <Button 
+                        <Button
                           variant="outline"
                           onClick={() => setSelectedAssignment(assignment.id)}
                           size="sm"

@@ -19,7 +19,8 @@ import { ClientDashboard } from './components/client/ClientDashboard';
 import { User, Task, Project, WorkLogEntry, Material, ProjectAssignment } from './types';
 import { mockUsers, mockProjects, mockTasks, mockCompanyRevenue, mockWorkLogs, mockMaterials } from './data/mockData';
 import { emailService } from './utils/emailService';
-import { apiBaseUrl, publicAnonKey } from './utils/supabase/info';
+import { apiService } from './utils/apiService';
+import { useTimeBasedTheme } from './hooks/useTimeBasedTheme';
 
 type ViewType = 'dashboard' | 'projects' | 'tasks' | 'users' | 'materials' | 'reports' | 'settings' | 'team' | 'worklog' | 'revenue' | 'assignments' | 'archives' | 'project-status' | 'documentation';
 type AuthView = 'main' | 'fabricator-signup' | 'forgot-password';
@@ -35,24 +36,20 @@ export default function App() {
   const [materials, setMaterials] = useState(mockMaterials);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Initialize time-based theme
+  const { isDark, isTransitioning, setTheme, getCurrentTheme } = useTimeBasedTheme();
+
   // Initialize database and load data
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Skip API calls if no Supabase URL is configured
-        if (!apiBaseUrl || apiBaseUrl.includes('placeholder')) {
-          console.warn('Supabase not configured. Running in demo mode with local data.');
+        // Check if backend is available
+        const healthCheck = await apiService.healthCheck();
+        if (healthCheck.error) {
+          console.warn('Backend not available. Running in demo mode with local data.');
           setIsInitialized(true);
           return;
         }
-
-        // Initialize database
-        await fetch(`${apiBaseUrl}/init`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${publicAnonKey}`
-          }
-        });
 
         // Load data from database
         await loadDataFromDatabase();
@@ -69,52 +66,32 @@ export default function App() {
 
   const loadDataFromDatabase = async () => {
     try {
-      // Skip if no API URL configured
-      if (!apiBaseUrl || apiBaseUrl.includes('placeholder')) {
-        return;
-      }
-
       const [projectsRes, tasksRes, workLogsRes, materialsRes, usersRes] = await Promise.all([
-        fetch(`${apiBaseUrl}/projects`, {
-          headers: { 'Authorization': `Bearer ${publicAnonKey}` }
-        }),
-        fetch(`${apiBaseUrl}/tasks`, {
-          headers: { 'Authorization': `Bearer ${publicAnonKey}` }
-        }),
-        fetch(`${apiBaseUrl}/worklogs`, {
-          headers: { 'Authorization': `Bearer ${publicAnonKey}` }
-        }),
-        fetch(`${apiBaseUrl}/materials`, {
-          headers: { 'Authorization': `Bearer ${publicAnonKey}` }
-        }),
-        fetch(`${apiBaseUrl}/users`, {
-          headers: { 'Authorization': `Bearer ${publicAnonKey}` }
-        })
+        apiService.getProjects(),
+        apiService.getTasks(),
+        apiService.getWorkLogs(),
+        apiService.getMaterials(),
+        apiService.getUsers()
       ]);
 
-      if (projectsRes.ok) {
-        const projectsData = await projectsRes.json();
-        setProjects(projectsData);
+      if (projectsRes.data) {
+        setProjects(projectsRes.data);
       }
 
-      if (tasksRes.ok) {
-        const tasksData = await tasksRes.json();
-        setTasks(tasksData);
+      if (tasksRes.data) {
+        setTasks(tasksRes.data);
       }
 
-      if (workLogsRes.ok) {
-        const workLogsData = await workLogsRes.json();
-        setWorkLogs(workLogsData);
+      if (workLogsRes.data) {
+        setWorkLogs(workLogsRes.data);
       }
 
-      if (materialsRes.ok) {
-        const materialsData = await materialsRes.json();
-        setMaterials(materialsData);
+      if (materialsRes.data) {
+        setMaterials(materialsRes.data);
       }
 
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsers(usersData);
+      if (usersRes.data) {
+        setUsers(usersRes.data);
       }
     } catch (error) {
       console.error('Failed to load data from database:', error);
@@ -127,6 +104,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    apiService.logout();
     setCurrentUser(null);
     setCurrentView('dashboard');
     setAuthView('main');
@@ -153,8 +131,8 @@ export default function App() {
   };
 
   const handleUpdateTaskStatus = (taskId: string, status: Task['status']) => {
-    setTasks(prevTasks => 
-      prevTasks.map(task => 
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
         task.id === taskId ? { ...task, status, updatedAt: new Date().toISOString() } : task
       )
     );
@@ -171,9 +149,9 @@ export default function App() {
   };
 
   const handleUpdateTask = (taskId: string, updates: Partial<Task>) => {
-    setTasks(prevTasks => 
-      prevTasks.map(task => 
-        task.id === taskId 
+    setTasks(prevTasks =>
+      prevTasks.map(task =>
+        task.id === taskId
           ? { ...task, ...updates, updatedAt: new Date().toISOString() }
           : task
       )
@@ -186,32 +164,14 @@ export default function App() {
 
   const handleCreateProject = async (projectData: Omit<Project, 'id'>): Promise<Project> => {
     try {
-      // Skip API call if no Supabase URL configured
-      if (!apiBaseUrl || apiBaseUrl.includes('placeholder')) {
-        const newProject: Project = {
-          ...projectData,
-          id: `project-${Date.now()}`
-        };
-        setProjects(prevProjects => [...prevProjects, newProject]);
-        return newProject;
+      const response = await apiService.createProject(projectData);
+
+      if (response.data) {
+        setProjects(prevProjects => [...prevProjects, response.data]);
+        return response.data;
+      } else {
+        throw new Error(response.error || 'Failed to create project');
       }
-
-      const response = await fetch(`${apiBaseUrl}/projects`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify(projectData)
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create project');
-      }
-
-      const newProject = await response.json();
-      setProjects(prevProjects => [...prevProjects, newProject]);
-      return newProject;
     } catch (error) {
       console.error('Failed to create project:', error);
       // Fallback to local creation
@@ -234,9 +194,9 @@ export default function App() {
 
     // Update project progress based on work log
     const progressIncrease = workLogData.progressPercentage;
-    setProjects(prevProjects => 
-      prevProjects.map(project => 
-        project.id === workLogData.projectId 
+    setProjects(prevProjects =>
+      prevProjects.map(project =>
+        project.id === workLogData.projectId
           ? { ...project, progress: Math.min(100, project.progress + progressIncrease) }
           : project
       )
@@ -253,17 +213,17 @@ export default function App() {
   };
 
   const handleAcceptAssignment = (assignmentId: string, response?: string) => {
-    setProjects(prevProjects => 
+    setProjects(prevProjects =>
       prevProjects.map(project => ({
         ...project,
-        pendingAssignments: project.pendingAssignments?.map(assignment => 
-          assignment.id === assignmentId 
+        pendingAssignments: project.pendingAssignments?.map(assignment =>
+          assignment.id === assignmentId
             ? {
-                ...assignment,
-                status: 'accepted' as const,
-                response,
-                respondedAt: new Date().toISOString()
-              }
+              ...assignment,
+              status: 'accepted' as const,
+              response,
+              respondedAt: new Date().toISOString()
+            }
             : assignment
         ),
         fabricatorIds: project.pendingAssignments?.find(a => a.id === assignmentId && a.status === 'pending')
@@ -277,17 +237,17 @@ export default function App() {
   };
 
   const handleDeclineAssignment = (assignmentId: string, response?: string) => {
-    setProjects(prevProjects => 
+    setProjects(prevProjects =>
       prevProjects.map(project => ({
         ...project,
-        pendingAssignments: project.pendingAssignments?.map(assignment => 
-          assignment.id === assignmentId 
+        pendingAssignments: project.pendingAssignments?.map(assignment =>
+          assignment.id === assignmentId
             ? {
-                ...assignment,
-                status: 'declined' as const,
-                response,
-                respondedAt: new Date().toISOString()
-              }
+              ...assignment,
+              status: 'declined' as const,
+              response,
+              respondedAt: new Date().toISOString()
+            }
             : assignment
         )
       }))
@@ -311,14 +271,14 @@ export default function App() {
       message
     };
 
-    setProjects(prevProjects => 
-      prevProjects.map(p => 
+    setProjects(prevProjects =>
+      prevProjects.map(p =>
         p.id === projectId
           ? {
-              ...p,
-              pendingAssignments: [...(p.pendingAssignments || []), newAssignment],
-              status: 'pending-assignment' as const
-            }
+            ...p,
+            pendingAssignments: [...(p.pendingAssignments || []), newAssignment],
+            status: 'pending-assignment' as const
+          }
           : p
       )
     );
@@ -366,12 +326,12 @@ export default function App() {
   };
 
   const handleUpdateProject = (updatedProject: Project) => {
-    setProjects(prevProjects => 
-      prevProjects.map(p => 
+    setProjects(prevProjects =>
+      prevProjects.map(p =>
         p.id === updatedProject.id ? updatedProject : p
       )
     );
-    
+
     // Send email notification about project update
     if (currentUser) {
       emailService.sendProjectUpdate(updatedProject, users, 'progress_update', currentUser);
@@ -397,22 +357,20 @@ export default function App() {
     switch (authView) {
       case 'fabricator-signup':
         return (
-          <FabricatorSignupForm 
+          <FabricatorSignupForm
             onSignup={handleSignup}
             onBackToMain={handleBackToMain}
           />
         );
-      
+
       case 'forgot-password':
         return (
-          <ForgotPasswordForm 
-            onBackToMain={handleBackToMain}
-          />
+          <ForgotPasswordForm onBackToLogin={handleBackToMain} />
         );
-      
+
       default:
         return (
-          <LoginForm 
+          <LoginForm
             onLogin={handleLogin}
             onShowSignup={handleShowFabricatorSignup}
             onShowForgotPassword={handleShowForgotPassword}
@@ -454,18 +412,18 @@ export default function App() {
       case 'dashboard':
         return (
           <div className="space-y-6">
-            <DashboardStats 
+            <DashboardStats
               projects={projects}
               tasks={tasks}
               users={users}
               currentUser={currentUser}
             />
             <div className="grid gap-6 lg:grid-cols-2">
-              <ProjectOverview 
+              <ProjectOverview
                 projects={projects}
                 currentUser={currentUser}
               />
-              <TaskList 
+              <TaskList
                 tasks={tasks}
                 projects={projects}
                 currentUser={currentUser}
@@ -474,10 +432,10 @@ export default function App() {
             </div>
           </div>
         );
-      
+
       case 'projects':
         return (
-          <ProjectsGrid 
+          <ProjectsGrid
             projects={projects}
             users={users}
             currentUser={currentUser}
@@ -581,7 +539,7 @@ export default function App() {
 
       case 'revenue':
         return (
-          <RevenueOverview 
+          <RevenueOverview
             projects={projects}
             companyRevenue={mockCompanyRevenue}
             currentUser={currentUser}
@@ -590,26 +548,26 @@ export default function App() {
 
       case 'reports':
         return (
-          <ReportsManager 
+          <ReportsManager
             projects={projects}
             users={users}
             tasks={tasks}
             currentUser={currentUser}
           />
         );
-      
+
       case 'users':
         return (
-          <UserManagement 
+          <UserManagement
             users={users}
             setUsers={setUsers}
             currentUser={currentUser}
           />
         );
-      
+
       case 'tasks':
         return (
-          <TaskManager 
+          <TaskManager
             tasks={tasks}
             projects={projects}
             users={users}
@@ -619,7 +577,7 @@ export default function App() {
             onDeleteTask={handleDeleteTask}
           />
         );
-      
+
       default:
         return (
           <div className="flex items-center justify-center h-64">
@@ -635,7 +593,13 @@ export default function App() {
   };
 
   return (
-    <AppLayout currentUser={currentUser} onLogout={handleLogout}>
+    <AppLayout
+      currentUser={currentUser}
+      onLogout={handleLogout}
+      currentTheme={getCurrentTheme()}
+      onThemeChange={setTheme}
+      isTransitioning={isTransitioning}
+    >
       {renderView()}
     </AppLayout>
   );

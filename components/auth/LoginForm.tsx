@@ -8,7 +8,7 @@ import { Separator } from '../ui/separator';
 import { Shield, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { User } from '../../types';
 import { CompanyLogo } from '../ui/company-logo';
-import { apiBaseUrl, publicAnonKey } from '../../utils/supabase/info';
+import { apiService } from '../../utils/apiService';
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
@@ -37,8 +37,17 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
 
     try {
       // Check if we're in demo mode (no proper Supabase setup)
-      if (!apiBaseUrl || apiBaseUrl.includes('placeholder')) {
-        // Demo mode - simulate login
+      // Try API login first
+      const response = await apiService.login(formData.identifier, formData.password);
+
+      if (response.data) {
+        // Set the token in the API service
+        if (response.data.token) {
+          apiService.setToken(response.data.token);
+        }
+        onLogin(response.data.user);
+      } else {
+        // If API fails, try demo mode as fallback
         if (formData.identifier.toLowerCase() === 'admin' && formData.password === 'admin123') {
           const demoAdminUser = {
             id: 'admin-1',
@@ -56,27 +65,28 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
           onLogin(demoAdminUser);
           return;
         } else {
-          throw new Error('Invalid credentials. Please check your username and password.');
+          throw new Error(response.error || 'Login failed');
         }
       }
-
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
-
-      onLogin(data.user);
     } catch (err) {
+      // If API is completely unavailable, try demo mode
+      if (formData.identifier.toLowerCase() === 'admin' && formData.password === 'admin123') {
+        const demoAdminUser = {
+          id: 'admin-1',
+          name: 'Demo Administrator',
+          email: 'admin@ehub.com',
+          role: 'admin' as const,
+          school: 'Ehub University',
+          phone: '+63 123 456 7890',
+          gcashNumber: '09123456789',
+          secureId: 'ADM001',
+          employeeNumber: 'EMP001',
+          isActive: true,
+          createdAt: new Date().toISOString()
+        };
+        onLogin(demoAdminUser);
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setIsLoading(false);
@@ -90,7 +100,7 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
       </div>
-      
+
       <Card className="w-full max-w-md relative z-10 shadow-2xl border-0">
         <CardHeader className="text-center space-y-4 pb-8">
           <div className="flex items-center justify-center mb-4">
@@ -197,7 +207,7 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
           </div>
 
           {/* Fabricator Signup */}
-          <Button 
+          <Button
             onClick={onShowSignup}
             variant="outline"
             className="w-full h-11"

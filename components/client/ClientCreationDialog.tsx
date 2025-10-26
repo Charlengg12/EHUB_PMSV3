@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
 import { UserPlus, CheckCircle2, Copy, Eye, EyeOff } from 'lucide-react';
 import { User, Project } from '../../types';
-import { apiBaseUrl, publicAnonKey } from '../../utils/supabase/info';
+import { apiService } from '../../utils/apiService';
 
 interface ClientCreationDialogProps {
   open: boolean;
@@ -64,7 +64,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -72,27 +72,18 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${apiBaseUrl}/users/client`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          projectId: project.id,
-          projectName: project.name
-        })
+      const response = await apiService.createClient({
+        ...formData,
+        projectId: project.id,
+        projectName: project.name
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create client account');
+      if (response.data) {
+        setCreatedClient(response.data);
+        onClientCreated(response.data);
+      } else {
+        throw new Error(response.error || 'Failed to create client account');
       }
-
-      setCreatedClient(data.user);
-      onClientCreated(data.user);
     } catch (err) {
       setErrors({ submit: err instanceof Error ? err.message : 'Failed to create client account' });
     } finally {
@@ -139,7 +130,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
 
             <div className="space-y-3 p-4 bg-muted rounded-lg">
               <p className="text-sm">Client Login Credentials:</p>
-              
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 bg-background rounded">
                   <div>

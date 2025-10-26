@@ -3,13 +3,17 @@ import { Badge } from '../ui/badge';
 import { LogOut, Shield, Crown } from 'lucide-react';
 import { User } from '../../types';
 import { CompanyLogo } from '../ui/company-logo';
+import { ThemeToggle } from '../ui/theme-toggle';
 
 interface HeaderProps {
   currentUser: User;
   onLogout: () => void;
+  currentTheme: 'light' | 'dark' | 'auto';
+  onThemeChange: (theme: 'light' | 'dark' | 'auto') => void;
+  isTransitioning?: boolean;
 }
 
-export function Header({ currentUser, onLogout }: HeaderProps) {
+export function Header({ currentUser, onLogout, currentTheme, onThemeChange, isTransitioning }: HeaderProps) {
   const getRoleIcon = () => {
     switch (currentUser.role) {
       case 'admin':
@@ -43,8 +47,14 @@ export function Header({ currentUser, onLogout }: HeaderProps) {
       <div className="flex items-center gap-4">
         <CompanyLogo size="md" showText={true} clickable={true} />
       </div>
-      
+
       <div className="flex items-center gap-4">
+        <ThemeToggle
+          currentTheme={currentTheme}
+          onThemeChange={onThemeChange}
+          isTransitioning={isTransitioning}
+        />
+
         <div className="flex items-center gap-3 px-4 py-2 bg-muted/50 rounded-lg">
           {getRoleIcon()}
           <div className="text-right">
@@ -57,10 +67,10 @@ export function Header({ currentUser, onLogout }: HeaderProps) {
             </div>
           </div>
         </div>
-        
-        <Button 
-          variant="outline" 
-          size="sm" 
+
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onLogout}
           className="ml-2 border-border hover:bg-destructive hover:text-destructive-foreground"
         >

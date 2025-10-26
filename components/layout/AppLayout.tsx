@@ -8,15 +8,24 @@ interface AppLayoutProps {
   children: ReactNode;
   currentUser: User;
   onLogout: () => void;
+  currentTheme: 'light' | 'dark' | 'auto';
+  onThemeChange: (theme: 'light' | 'dark' | 'auto') => void;
+  isTransitioning?: boolean;
 }
 
-export function AppLayout({ children, currentUser, onLogout }: AppLayoutProps) {
+export function AppLayout({ children, currentUser, onLogout, currentTheme, onThemeChange, isTransitioning }: AppLayoutProps) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar currentUser={currentUser} />
         <SidebarInset className="flex-1">
-          <Header currentUser={currentUser} onLogout={onLogout} />
+          <Header
+            currentUser={currentUser}
+            onLogout={onLogout}
+            currentTheme={currentTheme}
+            onThemeChange={onThemeChange}
+            isTransitioning={isTransitioning}
+          />
           <main className="flex-1 p-6">
             {children}
           </main>

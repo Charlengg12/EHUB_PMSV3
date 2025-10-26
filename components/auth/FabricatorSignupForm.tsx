@@ -9,7 +9,7 @@ import { ArrowLeft, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { User } from '../../types';
 import { CompanyLogo } from '../ui/company-logo';
 import { RegistrationSuccessDialog } from './RegistrationSuccessDialog';
-import { apiBaseUrl, publicAnonKey } from '../../utils/supabase/info';
+import { apiService } from '../../utils/apiService';
 
 // Schools list for the dropdown
 const SCHOOLS = [
@@ -73,7 +73,7 @@ export function FabricatorSignupForm({ onSignup, onBackToMain }: FabricatorSignu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
@@ -84,52 +84,21 @@ export function FabricatorSignupForm({ onSignup, onBackToMain }: FabricatorSignu
     setError('');
 
     try {
-      // Check if we're in demo mode (no proper Supabase setup)
-      if (!apiBaseUrl || apiBaseUrl.includes('placeholder')) {
-        // Demo mode - create a local user
-        const demoUser = {
-          id: `user-${Date.now()}`,
-          name: formData.name,
-          email: formData.email.toLowerCase(),
-          role: 'fabricator' as const,
-          school: formData.school,
-          phone: formData.phone,
-          gcashNumber: formData.gcashNumber,
-          secureId: `FAB${Math.random().toString(36).substr(2, 3).toUpperCase()}`,
-          employeeNumber: `EMP${Date.now().toString().slice(-6)}`,
-          isActive: true,
-          createdAt: new Date().toISOString()
-        };
-        
-        setRegisteredUser(demoUser);
-        setShowSuccessDialog(true);
-        return;
-      }
-
-      const response = await fetch(`${apiBaseUrl}/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${publicAnonKey}`
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          school: formData.school,
-          phone: formData.phone,
-          gcashNumber: formData.gcashNumber
-        })
+      const response = await apiService.signup({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        school: formData.school,
+        phone: formData.phone,
+        gcashNumber: formData.gcashNumber
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Signup failed');
+      if (response.data) {
+        setRegisteredUser(response.data);
+        setShowSuccessDialog(true);
+      } else {
+        throw new Error(response.error || 'Signup failed');
       }
-
-      setRegisteredUser(data.user);
-      setShowSuccessDialog(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
@@ -156,7 +125,7 @@ export function FabricatorSignupForm({ onSignup, onBackToMain }: FabricatorSignu
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
           <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-accent/10 rounded-full blur-3xl"></div>
         </div>
-        
+
         <Card className="w-full max-w-md relative z-10 shadow-2xl border-0">
           <CardHeader className="text-center space-y-4 pb-8">
             <div className="flex items-center justify-center mb-4">
