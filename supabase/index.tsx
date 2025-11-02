@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Hono } from "npm:hono";
 import { cors } from "npm:hono/cors";
 import { logger } from "npm:hono/logger";
@@ -67,12 +68,12 @@ app.get("/make-server-ebae10ad/health", (c) => {
 app.post("/make-server-ebae10ad/auth/login", async (c) => {
   try {
     const { identifier, password } = await c.req.json();
-    
+
     // Check for admin login
     if (identifier === 'admin' && password === 'admin123') {
       const adminUsers = await kv.get('admin_users') || [];
       let adminUser = adminUsers.find((u: any) => u.role === 'admin');
-      
+
       if (!adminUser) {
         // Create default admin user
         adminUser = {
@@ -91,32 +92,32 @@ app.post("/make-server-ebae10ad/auth/login", async (c) => {
         adminUsers.push(adminUser);
         await kv.set('admin_users', adminUsers);
       }
-      
+
       return c.json({ user: adminUser });
     }
-    
+
     // Check for regular users by identifier
     const users = await kv.get('users') || [];
-    const user = users.find((u: any) => 
+    const user = users.find((u: any) =>
       u.secureId?.toLowerCase() === identifier.toLowerCase() ||
       u.employeeNumber?.toLowerCase() === identifier.toLowerCase() ||
       u.email?.toLowerCase() === identifier.toLowerCase()
     );
-    
+
     if (!user) {
       return c.json({ error: 'User not found' }, 404);
     }
-    
+
     if (!user.isActive) {
       return c.json({ error: 'Account is inactive' }, 403);
     }
-    
+
     // Verify password (simplified for demo)
     const hashedInputPassword = await hashPassword(password);
     if (user.passwordHash && user.passwordHash !== hashedInputPassword) {
       return c.json({ error: 'Invalid password' }, 401);
     }
-    
+
     return c.json({ user });
   } catch (error) {
     console.log('Login exception:', error);
@@ -127,20 +128,20 @@ app.post("/make-server-ebae10ad/auth/login", async (c) => {
 app.post("/make-server-ebae10ad/auth/signup", async (c) => {
   try {
     const { email, password, name, school, phone, gcashNumber } = await c.req.json();
-    
+
     // Check if user already exists
     const users = await kv.get('users') || [];
     const existingUser = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-    
+
     if (existingUser) {
       return c.json({ error: 'User already exists with this email' }, 409);
     }
-    
+
     // Generate secure credentials
     const secureId = generateSecureId('fabricator');
     const employeeNumber = generateEmployeeNumber();
     const passwordHash = await hashPassword(password);
-    
+
     const newUser = {
       id: `user-${Date.now()}`,
       name,
@@ -155,10 +156,10 @@ app.post("/make-server-ebae10ad/auth/signup", async (c) => {
       isActive: true,
       createdAt: new Date().toISOString()
     };
-    
+
     users.push(newUser);
     await kv.set('users', users);
-    
+
     // Send welcome email
     const welcomeEmail = `
       <h2>Welcome to Ehub Project Management!</h2>
@@ -172,9 +173,9 @@ app.post("/make-server-ebae10ad/auth/signup", async (c) => {
       <p>Please keep these credentials secure and use your Login ID to access the system.</p>
       <p>Best regards,<br>Ehub Project Management Team</p>
     `;
-    
+
     await sendEmail(email, 'Welcome to Ehub Project Management', welcomeEmail);
-    
+
     return c.json({ user: { ...newUser, passwordHash: undefined } });
   } catch (error) {
     console.log('Signup exception:', error);
@@ -185,19 +186,19 @@ app.post("/make-server-ebae10ad/auth/signup", async (c) => {
 app.post("/make-server-ebae10ad/forgot-password", async (c) => {
   try {
     const { email } = await c.req.json();
-    
+
     const users = await kv.get('users') || [];
     const user = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-    
+
     if (!user) {
       // Don't reveal if user exists or not for security
       return c.json({ message: 'If an account exists with this email, a reset link has been sent.' });
     }
-    
+
     // Generate reset token
     const resetToken = crypto.randomUUID();
     const resetExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-    
+
     // Save reset token
     const resetTokens = await kv.get('password_reset_tokens') || [];
     resetTokens.push({
@@ -207,7 +208,7 @@ app.post("/make-server-ebae10ad/forgot-password", async (c) => {
       used: false
     });
     await kv.set('password_reset_tokens', resetTokens);
-    
+
     // Send reset email
     const resetEmail = `
       <h2>Password Reset Request</h2>
@@ -224,9 +225,9 @@ app.post("/make-server-ebae10ad/forgot-password", async (c) => {
       <p>If you did not request this reset, please ignore this email.</p>
       <p>Best regards,<br>Ehub Project Management Team</p>
     `;
-    
+
     await sendEmail(email, 'Password Reset Request - Ehub Project Management', resetEmail);
-    
+
     return c.json({ message: 'If an account exists with this email, a reset link has been sent.' });
   } catch (error) {
     console.log('Forgot password exception:', error);
@@ -249,20 +250,48 @@ app.post("/make-server-ebae10ad/projects", async (c) => {
   try {
     const projectData = await c.req.json();
     const projects = await kv.get('projects') || [];
-    
+
     const newProject = {
       ...projectData,
       id: `project-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    
+
     projects.push(newProject);
     await kv.set('projects', projects);
-    
+
     return c.json(newProject);
   } catch (error) {
     console.log('Create project error:', error);
     return c.json({ error: 'Failed to create project' }, 500);
+  }
+});
+
+app.put("/make-server-ebae10ad/projects/:id", async (c) => {
+  try {
+    const projectId = c.req.param('id');
+    const updates = await c.req.json();
+    const projects = await kv.get('projects') || [];
+
+    const index = projects.findIndex((p: any) => p.id === projectId);
+    if (index === -1) {
+      return c.json({ error: 'Project not found' }, 404);
+    }
+
+    const updatedProject = {
+      ...projects[index],
+      ...updates,
+      // ensure id remains consistent
+      id: projects[index].id,
+    };
+
+    projects[index] = updatedProject;
+    await kv.set('projects', projects);
+
+    return c.json(updatedProject);
+  } catch (error) {
+    console.log('Update project error:', error);
+    return c.json({ error: 'Failed to update project' }, 500);
   }
 });
 
@@ -281,17 +310,17 @@ app.post("/make-server-ebae10ad/tasks", async (c) => {
   try {
     const taskData = await c.req.json();
     const tasks = await kv.get('tasks') || [];
-    
+
     const newTask = {
       ...taskData,
       id: `task-${Date.now()}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    
+
     tasks.push(newTask);
     await kv.set('tasks', tasks);
-    
+
     return c.json(newTask);
   } catch (error) {
     console.log('Create task error:', error);
@@ -304,20 +333,20 @@ app.put("/make-server-ebae10ad/tasks/:id", async (c) => {
     const taskId = c.req.param('id');
     const updates = await c.req.json();
     const tasks = await kv.get('tasks') || [];
-    
+
     const taskIndex = tasks.findIndex(task => task.id === taskId);
     if (taskIndex === -1) {
       return c.json({ error: 'Task not found' }, 404);
     }
-    
+
     tasks[taskIndex] = {
       ...tasks[taskIndex],
       ...updates,
       updatedAt: new Date().toISOString(),
     };
-    
+
     await kv.set('tasks', tasks);
-    
+
     return c.json(tasks[taskIndex]);
   } catch (error) {
     console.log('Update task error:', error);
@@ -329,10 +358,10 @@ app.delete("/make-server-ebae10ad/tasks/:id", async (c) => {
   try {
     const taskId = c.req.param('id');
     const tasks = await kv.get('tasks') || [];
-    
+
     const filteredTasks = tasks.filter(task => task.id !== taskId);
     await kv.set('tasks', filteredTasks);
-    
+
     return c.json({ success: true });
   } catch (error) {
     console.log('Delete task error:', error);
@@ -355,16 +384,16 @@ app.post("/make-server-ebae10ad/worklogs", async (c) => {
   try {
     const workLogData = await c.req.json();
     const workLogs = await kv.get('workLogs') || [];
-    
+
     const newWorkLog = {
       ...workLogData,
       id: `wl-${Date.now()}`,
       createdAt: new Date().toISOString(),
     };
-    
+
     workLogs.push(newWorkLog);
     await kv.set('workLogs', workLogs);
-    
+
     return c.json(newWorkLog);
   } catch (error) {
     console.log('Create work log error:', error);
@@ -387,16 +416,16 @@ app.post("/make-server-ebae10ad/materials", async (c) => {
   try {
     const materialData = await c.req.json();
     const materials = await kv.get('materials') || [];
-    
+
     const newMaterial = {
       ...materialData,
       id: `mat-${Date.now()}`,
       addedAt: new Date().toISOString(),
     };
-    
+
     materials.push(newMaterial);
     await kv.set('materials', materials);
-    
+
     return c.json(newMaterial);
   } catch (error) {
     console.log('Create material error:', error);
@@ -419,20 +448,20 @@ app.get("/make-server-ebae10ad/users", async (c) => {
 app.post("/make-server-ebae10ad/users/supervisor", async (c) => {
   try {
     const { email, password, name, phone, department } = await c.req.json();
-    
+
     // Check if user already exists
     const users = await kv.get('users') || [];
     const existingUser = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-    
+
     if (existingUser) {
       return c.json({ error: 'User already exists with this email' }, 409);
     }
-    
+
     // Generate secure credentials
     const secureId = generateSecureId('supervisor');
     const employeeNumber = generateEmployeeNumber();
     const passwordHash = await hashPassword(password);
-    
+
     const newUser = {
       id: `user-${Date.now()}`,
       name,
@@ -446,10 +475,10 @@ app.post("/make-server-ebae10ad/users/supervisor", async (c) => {
       isActive: true,
       createdAt: new Date().toISOString()
     };
-    
+
     users.push(newUser);
     await kv.set('users', users);
-    
+
     // Send welcome email
     const welcomeEmail = `
       <h2>Welcome to Ehub Project Management!</h2>
@@ -463,9 +492,9 @@ app.post("/make-server-ebae10ad/users/supervisor", async (c) => {
       <p>Please keep these credentials secure and use your Secure ID or Email to login.</p>
       <p>Best regards,<br>Ehub Project Management Team</p>
     `;
-    
+
     await sendEmail(email, 'Welcome to Ehub Project Management - Supervisor Account', welcomeEmail);
-    
+
     return c.json({ user: { ...newUser, passwordHash: undefined } });
   } catch (error) {
     console.log('Create supervisor exception:', error);
@@ -477,19 +506,19 @@ app.post("/make-server-ebae10ad/users/supervisor", async (c) => {
 app.post("/make-server-ebae10ad/users/client", async (c) => {
   try {
     const { email, password, name, phone, projectId, projectName } = await c.req.json();
-    
+
     // Check if user already exists
     const users = await kv.get('users') || [];
     const existingUser = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
-    
+
     if (existingUser) {
       return c.json({ error: 'User already exists with this email' }, 409);
     }
-    
+
     // Generate secure credentials for client
     const secureId = generateSecureId('admin'); // Using admin format for clients: CLI prefix
     const passwordHash = await hashPassword(password);
-    
+
     const newUser = {
       id: `user-${Date.now()}`,
       name,
@@ -503,10 +532,10 @@ app.post("/make-server-ebae10ad/users/client", async (c) => {
       isActive: true,
       createdAt: new Date().toISOString()
     };
-    
+
     users.push(newUser);
     await kv.set('users', users);
-    
+
     // Send welcome email
     const welcomeEmail = `
       <h2>Welcome to Ehub Project Management!</h2>
@@ -527,9 +556,9 @@ app.post("/make-server-ebae10ad/users/client", async (c) => {
       <p>Please keep these credentials secure.</p>
       <p>Best regards,<br>Ehub Project Management Team</p>
     `;
-    
+
     await sendEmail(email, `Welcome to Ehub - ${projectName} Client Portal`, welcomeEmail);
-    
+
     return c.json({ user: { ...newUser, passwordHash: undefined } });
   } catch (error) {
     console.log('Create client exception:', error);
@@ -550,11 +579,28 @@ app.post("/make-server-ebae10ad/init", async (c) => {
       await kv.set('materials', []);
       await kv.set('users', []);
     }
-    
+
     return c.json({ message: 'Database initialized' });
   } catch (error) {
     console.log('Init error:', error);
     return c.json({ error: 'Failed to initialize database' }, 500);
+  }
+});
+
+// Danger: Clear all application data (users, admins, projects, tasks, logs, materials)
+app.post("/make-server-ebae10ad/reset", async (c) => {
+  try {
+    await kv.set('projects', []);
+    await kv.set('tasks', []);
+    await kv.set('workLogs', []);
+    await kv.set('materials', []);
+    await kv.set('users', []);
+    await kv.set('admin_users', []);
+    await kv.set('password_reset_tokens', []);
+    return c.json({ message: 'All data cleared' });
+  } catch (error) {
+    console.log('Reset error:', error);
+    return c.json({ error: 'Failed to clear data' }, 500);
   }
 });
 

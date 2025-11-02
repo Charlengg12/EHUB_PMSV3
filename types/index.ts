@@ -1,4 +1,7 @@
+import { ReactNode } from "react";
+
 export interface User {
+  department: ReactNode;
   id: string;
   name: string;
   email: string;
@@ -16,7 +19,18 @@ export interface Project {
   id: string;
   name: string;
   description: string;
-  status: 'planning' | 'in-progress' | 'review' | 'completed' | 'on-hold' | 'pending-assignment';
+  status:
+  | '0_Created'
+  | '1_Assigned_to_FAB'
+  | '2_Ready_for_Supervisor_Review'
+  | '3_Ready_for_Admin_Review'
+  | '4_Ready_for_Client_Signoff'
+  | 'planning'
+  | 'in-progress'
+  | 'review'
+  | 'completed'
+  | 'on-hold'
+  | 'pending-assignment';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   startDate: string;
   endDate: string;

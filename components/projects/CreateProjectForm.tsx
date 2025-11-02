@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
@@ -9,41 +9,56 @@ import { Alert, AlertDescription } from '../ui/alert';
 import { Calendar } from '../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Badge } from '../ui/badge';
-import { X, Plus, CalendarIcon, Building, CheckCircle2, UserPlus } from 'lucide-react';
+import { X, Plus, CalendarIcon, Building, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { Project, User } from '../../types';
-import { ClientCreationDialog } from '../client/ClientCreationDialog';
+// Removed embedded client creation dialog; it will be launched separately from the Projects page
 
 interface CreateProjectFormProps {
   currentUser: User;
   users: User[];
   onCreateProject: (project: Omit<Project, 'id'>) => void | Promise<void> | Promise<Project>;
-  onClientCreated: (client: User) => void;
   onClose: () => void;
 }
 
-export function CreateProjectForm({ currentUser, users, onCreateProject, onClientCreated, onClose }: CreateProjectFormProps) {
+export function CreateProjectForm({ currentUser, users, onCreateProject, onClose }: CreateProjectFormProps) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    clientName: '',
     priority: 'medium' as Project['priority'],
     startDate: new Date(),
     endDate: new Date(new Date().setMonth(new Date().getMonth() + 1)),
     supervisorId: '',
     fabricatorIds: [] as string[],
-    budget: '',
-    revenue: '',
+    fabricatorAllocation: '',
+    materialsAllocation: '',
+    supervisorAllocation: '',
+    companyAllocation: '',
+    totalProjectPrice: '',
+    supervisorAssignsFabricators: false, // New toggle state
     documentationUrl: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showStartCalendar, setShowStartCalendar] = useState(false);
   const [showEndCalendar, setShowEndCalendar] = useState(false);
-  const [createdProject, setCreatedProject] = useState<Project | null>(null);
-  const [showClientDialog, setShowClientDialog] = useState(false);
 
   const supervisors = users.filter(u => u.role === 'supervisor');
   const fabricators = users.filter(u => u.role === 'fabricator');
+
+  useEffect(() => {
+    const fabricator = parseFloat(formData.fabricatorAllocation) || 0;
+    const materials = parseFloat(formData.materialsAllocation) || 0;
+    const supervisor = parseFloat(formData.supervisorAllocation) || 0;
+    const company = parseFloat(formData.companyAllocation) || 0;
+
+    const total = fabricator + materials + supervisor + company;
+    setFormData(prev => ({ ...prev, totalProjectPrice: total.toFixed(2) }));
+  }, [
+    formData.fabricatorAllocation,
+    formData.materialsAllocation,
+    formData.supervisorAllocation,
+    formData.companyAllocation
+  ]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -56,28 +71,25 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
       newErrors.description = 'Project description is required';
     }
 
-    if (!formData.clientName.trim()) {
-      newErrors.clientName = 'Client name is required';
-    }
-
     if (!formData.supervisorId) {
       newErrors.supervisorId = 'Supervisor selection is required';
     }
 
-    if (formData.fabricatorIds.length === 0) {
-      newErrors.fabricatorIds = 'At least one fabricator must be assigned';
-    }
-
-    if (!formData.budget || parseFloat(formData.budget) <= 0) {
-      newErrors.budget = 'Valid budget amount is required';
-    }
-
-    if (!formData.revenue || parseFloat(formData.revenue) <= 0) {
-      newErrors.revenue = 'Valid revenue amount is required';
+    if (!formData.supervisorAssignsFabricators && formData.fabricatorIds.length === 0) {
+      newErrors.fabricatorIds = 'At least one fabricator must be assigned or supervisor must assign manually';
     }
 
     if (formData.endDate <= formData.startDate) {
       newErrors.endDate = 'End date must be after start date';
+    }
+
+    if (
+      (parseFloat(formData.fabricatorAllocation) || 0) < 0 ||
+      (parseFloat(formData.materialsAllocation) || 0) < 0 ||
+      (parseFloat(formData.supervisorAllocation) || 0) < 0 ||
+      (parseFloat(formData.companyAllocation) || 0) < 0
+    ) {
+      newErrors.totalProjectPrice = 'Allocations must be zero or positive numbers';
     }
 
     setErrors(newErrors);
@@ -86,7 +98,6 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -104,122 +115,44 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
+    const totalProjectPrice = parseFloat(formData.totalProjectPrice);
+
+    const shouldSupervisorAssign = formData.supervisorAssignsFabricators;
+    const initialStatus: Project['status'] = shouldSupervisorAssign ? '0_Created' : '1_Assigned_to_FAB';
+
     const newProject: Omit<Project, 'id'> = {
       name: formData.name,
       description: formData.description,
-      clientName: formData.clientName,
-      status: 'planning',
+      clientName: '',
+      status: initialStatus,
       priority: formData.priority,
       startDate: formData.startDate.toISOString().split('T')[0],
       endDate: formData.endDate.toISOString().split('T')[0],
       progress: 0,
       supervisorId: formData.supervisorId,
-      fabricatorIds: formData.fabricatorIds,
-      budget: parseFloat(formData.budget),
+      fabricatorIds: formData.supervisorAssignsFabricators ? [] : formData.fabricatorIds,
+      budget: totalProjectPrice,
       spent: 0,
-      revenue: parseFloat(formData.revenue),
+      revenue: 0,
       documentationUrl: formData.documentationUrl || undefined,
       createdBy: currentUser.id,
       createdAt: new Date().toISOString(),
-      fabricatorBudgets: []
+      fabricatorBudgets: [],
     };
 
-    // Create project and wait for it to get an ID
-    const result = await onCreateProject(newProject);
-    
-    // If result is a Project, use it; otherwise create a temp project
-    const projectWithId = (result && typeof result === 'object' && 'id' in result) 
-      ? result as Project
-      : { ...newProject, id: `project-${Date.now()}` } as Project;
-    
-    setCreatedProject(projectWithId);
-  };
-
-  const handleCreateClient = () => {
-    setShowClientDialog(true);
-  };
-
-  const handleSkipClient = () => {
-    setCreatedProject(null);
+    await onCreateProject(newProject);
     onClose();
-  };
-
-  const handleClientCreated = (client: User) => {
-    onClientCreated(client);
-    setShowClientDialog(false);
-    setCreatedProject(null);
-    onClose();
+    try { window.location.hash = 'projects'; } catch { }
   };
 
   const getFabricatorName = (id: string) => {
     return users.find(u => u.id === id)?.name || 'Unknown';
   };
-
-  // If project was created, show client creation prompt
-  if (createdProject && !showClientDialog) {
-    return (
-      <>
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-              <div className="flex items-center justify-center mb-4">
-                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-              <CardTitle>Project Created Successfully!</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 bg-muted rounded-lg">
-                <h3 className="mb-2">{createdProject.name}</h3>
-                <p className="text-sm text-muted-foreground">
-                  Client: {createdProject.clientName}
-                </p>
-              </div>
-
-              <div className="p-4 border-2 border-dashed rounded-lg text-center space-y-3">
-                <UserPlus className="h-8 w-8 mx-auto text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Create Client Account?</p>
-                  <p className="text-sm text-muted-foreground">
-                    Allow your client to track project progress and view documentation
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleSkipClient} className="flex-1">
-                  Skip for Now
-                </Button>
-                <Button onClick={handleCreateClient} className="flex-1">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Create Client Account
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {showClientDialog && (
-          <ClientCreationDialog
-            open={showClientDialog}
-            onClose={() => {
-              setShowClientDialog(false);
-              setCreatedProject(null);
-              onClose();
-            }}
-            project={createdProject}
-            onClientCreated={handleClientCreated}
-          />
-        )}
-      </>
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -236,12 +169,12 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Information */}
             <div className="space-y-4">
-              <h3>Basic Information</h3>
-              
+              <h3 className="text-lg font-medium">Basic Information</h3>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="name">Project Name *</Label>
@@ -253,18 +186,6 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
                     className={errors.name ? 'border-destructive' : ''}
                   />
                   {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="clientName">Client Name *</Label>
-                  <Input
-                    id="clientName"
-                    value={formData.clientName}
-                    onChange={(e) => handleInputChange('clientName', e.target.value)}
-                    placeholder="Enter client name"
-                    className={errors.clientName ? 'border-destructive' : ''}
-                  />
-                  {errors.clientName && <p className="text-sm text-destructive">{errors.clientName}</p>}
                 </div>
               </div>
 
@@ -301,8 +222,8 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
 
             {/* Timeline */}
             <div className="space-y-4">
-              <h3>Timeline</h3>
-              
+              <h3 className="text-lg font-medium">Timeline</h3>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
@@ -359,8 +280,8 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
 
             {/* Team Assignment */}
             <div className="space-y-4">
-              <h3>Team Assignment</h3>
-              
+              <h3 className="text-lg font-medium">Team Assignment</h3>
+
               <div className="space-y-2">
                 <Label htmlFor="supervisor">Supervisor *</Label>
                 <Select
@@ -381,73 +302,167 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
                 {errors.supervisorId && <p className="text-sm text-destructive">{errors.supervisorId}</p>}
               </div>
 
-              <div className="space-y-2">
-                <Label>Fabricators *</Label>
-                <Select onValueChange={handleAddFabricator}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Add fabricators" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {fabricators
-                      .filter(fab => !formData.fabricatorIds.includes(fab.id))
-                      .map(fabricator => (
-                        <SelectItem key={fabricator.id} value={fabricator.id}>
-                          {fabricator.name} - {fabricator.department}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-                
-                {formData.fabricatorIds.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.fabricatorIds.map(id => (
-                      <Badge key={id} variant="secondary" className="flex items-center gap-1">
-                        {getFabricatorName(id)}
-                        <X
-                          className="h-3 w-3 cursor-pointer"
-                          onClick={() => handleRemoveFabricator(id)}
-                        />
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {errors.fabricatorIds && <p className="text-sm text-destructive">{errors.fabricatorIds}</p>}
+              {/* Supervisor assigns fabricators manually toggle */}
+              <div className="flex items-center space-x-2">
+                <input
+                  id="supervisorAssignsFabricators"
+                  type="checkbox"
+                  checked={formData.supervisorAssignsFabricators}
+                  onChange={(e) => handleInputChange('supervisorAssignsFabricators', e.target.checked)}
+                  className="cursor-pointer"
+                />
+                <Label htmlFor="supervisorAssignsFabricators" className="cursor-pointer">
+                  Supervisor will assign fabricators manually
+                </Label>
               </div>
+              {formData.supervisorAssignsFabricators && (
+                <Alert>
+                  <AlertDescription>
+                    You can assign fabricators later from the project card using the Assign action.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Fabricators selection disabled if supervisor assigns manually */}
+              {!formData.supervisorAssignsFabricators && (
+                <div className="space-y-2">
+                  <Label>Fabricators *</Label>
+                  <Select onValueChange={handleAddFabricator}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Add fabricators" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fabricators
+                        .filter(fab => !formData.fabricatorIds.includes(fab.id))
+                        .map(fabricator => (
+                          <SelectItem key={fabricator.id} value={fabricator.id}>
+                            {fabricator.name} - {fabricator.department}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+
+                  {formData.fabricatorIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {formData.fabricatorIds.map(id => (
+                        <Badge key={id} variant="secondary" className="flex items-center gap-1">
+                          {getFabricatorName(id)}
+                          <X
+                            className="h-3 w-3 cursor-pointer"
+                            onClick={() => handleRemoveFabricator(id)}
+                          />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {errors.fabricatorIds && <p className="text-sm text-destructive">{errors.fabricatorIds}</p>}
+                </div>
+              )}
             </div>
 
-            {/* Financial Information */}
+            {/* Financial Allocation */}
             <div className="space-y-4">
-              <h3>Financial Information</h3>
-              
+              <div className="flex items-end justify-between">
+                <h3 className="text-lg font-medium">Financial Allocation</h3>
+                <div className="text-sm text-muted-foreground">Total Project Price</div>
+              </div>
+
+              {/* Financial Overview Preview */}
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Budget</span>
+                    </div>
+                    <p className="text-2xl">₱{(parseFloat(formData.totalProjectPrice) || 0).toLocaleString()}</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Spent</span>
+                    </div>
+                    <p className="text-2xl">₱0</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm">Revenue</span>
+                    </div>
+                    <p className="text-2xl">₱0</p>
+                  </CardContent>
+                </Card>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="budget">Total Budget * (₱)</Label>
+                  <Label htmlFor="fabricatorAllocation">Fabricator Allocation (₱)</Label>
                   <Input
-                    id="budget"
+                    id="fabricatorAllocation"
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.budget}
-                    onChange={(e) => handleInputChange('budget', e.target.value)}
+                    value={formData.fabricatorAllocation}
+                    onChange={(e) => handleInputChange('fabricatorAllocation', e.target.value)}
                     placeholder="0.00"
-                    className={errors.budget ? 'border-destructive' : ''}
                   />
-                  {errors.budget && <p className="text-sm text-destructive">{errors.budget}</p>}
+                  <p className="text-xs text-muted-foreground">Labor costs allocated to fabricators.</p>
                 </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="revenue">Expected Revenue * (₱)</Label>
+                  <Label htmlFor="materialsAllocation">Materials Allocation (₱)</Label>
                   <Input
-                    id="revenue"
+                    id="materialsAllocation"
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.revenue}
-                    onChange={(e) => handleInputChange('revenue', e.target.value)}
+                    value={formData.materialsAllocation}
+                    onChange={(e) => handleInputChange('materialsAllocation', e.target.value)}
                     placeholder="0.00"
-                    className={errors.revenue ? 'border-destructive' : ''}
                   />
-                  {errors.revenue && <p className="text-sm text-destructive">{errors.revenue}</p>}
+                  <p className="text-xs text-muted-foreground">Expected material expenses.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supervisorAllocation">Supervisor Allocation (₱)</Label>
+                  <Input
+                    id="supervisorAllocation"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.supervisorAllocation}
+                    onChange={(e) => handleInputChange('supervisorAllocation', e.target.value)}
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-muted-foreground">Supervisor fees or overhead.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="companyAllocation">Company Allocation (₱)</Label>
+                  <Input
+                    id="companyAllocation"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.companyAllocation}
+                    onChange={(e) => handleInputChange('companyAllocation', e.target.value)}
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-muted-foreground">Company margin and other costs.</p>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="flex items-center justify-between">
+                    <span>Total Project Price (₱)</span>
+                    <span className="text-muted-foreground">Auto-calculated</span>
+                  </Label>
+                  <Input
+                    readOnly
+                    value={formData.totalProjectPrice}
+                    placeholder="0.00"
+                  />
                 </div>
               </div>
             </div>
@@ -455,7 +470,7 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClien
             {/* Documentation */}
             <div className="space-y-4">
               <h3>Documentation (Optional)</h3>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="documentationUrl">Google Drive Documentation URL</Label>
                 <Input

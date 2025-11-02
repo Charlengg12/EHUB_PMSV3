@@ -19,6 +19,13 @@ export const useTimeBasedTheme = (config: Partial<ThemeConfig> = {}) => {
 
     useEffect(() => {
         const updateTheme = () => {
+            // Check if user has manually set a theme preference
+            const manualOverride = localStorage.getItem('theme-override');
+            if (manualOverride && manualOverride !== 'auto') {
+                // User has manually set theme, don't auto-update
+                return;
+            }
+
             const now = new Date();
             const currentHour = now.getHours();
             const currentMinute = now.getMinutes();
@@ -79,10 +86,25 @@ export const useTimeBasedTheme = (config: Partial<ThemeConfig> = {}) => {
             }
         };
 
-        // Update theme immediately
-        updateTheme();
+        // Initialize theme based on current preference
+        const initializeTheme = () => {
+            const manualOverride = localStorage.getItem('theme-override');
+            if (manualOverride === 'light') {
+                setIsDark(false);
+                document.documentElement.classList.remove('dark');
+            } else if (manualOverride === 'dark') {
+                setIsDark(true);
+                document.documentElement.classList.add('dark');
+            } else {
+                // Auto mode - use time-based logic
+                updateTheme();
+            }
+        };
 
-        // Update theme every minute
+        // Initialize theme immediately
+        initializeTheme();
+
+        // Update theme every minute (only for auto mode)
         const interval = setInterval(updateTheme, 60000);
 
         // Listen for system theme changes
@@ -104,10 +126,12 @@ export const useTimeBasedTheme = (config: Partial<ThemeConfig> = {}) => {
 
     // Manual theme override
     const setTheme = (theme: 'light' | 'dark' | 'auto') => {
+        console.log('🎨 Setting theme to:', theme);
         const root = document.documentElement;
 
         if (theme === 'auto') {
             localStorage.removeItem('theme-override');
+            console.log('🔄 Switched to auto mode - will follow time-based schedule');
             // Re-run the automatic theme logic
             const now = new Date();
             const currentHour = now.getHours();
@@ -116,21 +140,27 @@ export const useTimeBasedTheme = (config: Partial<ThemeConfig> = {}) => {
 
             const shouldBeDark = currentTime >= themeConfig.darkStart || currentTime < themeConfig.lightStart;
             setIsDark(shouldBeDark);
+            setIsTransitioning(false); // Clear transition state for manual override
 
             if (shouldBeDark) {
                 root.classList.add('dark');
+                console.log('🌙 Auto mode: Dark theme applied');
             } else {
                 root.classList.remove('dark');
+                console.log('☀️ Auto mode: Light theme applied');
             }
         } else {
             localStorage.setItem('theme-override', theme);
             const isDarkMode = theme === 'dark';
             setIsDark(isDarkMode);
+            setIsTransitioning(false); // Clear transition state for manual override
 
             if (isDarkMode) {
                 root.classList.add('dark');
+                console.log('🌙 Manual: Dark theme applied');
             } else {
                 root.classList.remove('dark');
+                console.log('☀️ Manual: Light theme applied');
             }
         }
     };
@@ -138,10 +168,10 @@ export const useTimeBasedTheme = (config: Partial<ThemeConfig> = {}) => {
     // Get current theme status
     const getCurrentTheme = () => {
         const override = localStorage.getItem('theme-override');
-        if (override && override !== 'auto') {
-            return override as 'light' | 'dark';
+        if (override) {
+            return override as 'light' | 'dark' | 'auto';
         }
-        return isDark ? 'dark' : 'light';
+        return 'auto';
     };
 
     return {

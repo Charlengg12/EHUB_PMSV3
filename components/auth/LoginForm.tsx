@@ -9,6 +9,7 @@ import { Shield, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { User } from '../../types';
 import { CompanyLogo } from '../ui/company-logo';
 import { apiService } from '../../utils/apiService';
+import { mapUserDataFromBackend } from '../../utils/userDataMapper';
 
 interface LoginFormProps {
   onLogin: (user: User) => void;
@@ -45,7 +46,10 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
         if (response.data.token) {
           apiService.setToken(response.data.token);
         }
-        onLogin(response.data.user);
+
+        const rawUserData = response.data.user;
+        const userData = mapUserDataFromBackend(rawUserData);
+        onLogin(userData);
       } else {
         // If API fails, try demo mode as fallback
         if (formData.identifier.toLowerCase() === 'admin' && formData.password === 'admin123') {
@@ -60,13 +64,31 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
             secureId: 'ADM001',
             employeeNumber: 'EMP001',
             isActive: true,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
+            department: 'Administration'
           };
           onLogin(demoAdminUser);
           return;
-        } else {
-          throw new Error(response.error || 'Login failed');
         }
+        if (formData.identifier.toLowerCase() === 'supervisor' && formData.password === 'supervisor123') {
+          const demoSupervisorUser = {
+            id: 'supervisor-1',
+            name: 'Demo Supervisor',
+            email: 'supervisor@ehub.com',
+            role: 'supervisor' as const,
+            school: 'Ehub University',
+            phone: '+63 987 654 3210',
+            gcashNumber: '09987654321',
+            secureId: 'SUP001',
+            employeeNumber: 'EMP101',
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            department: 'Demo Department'
+          };
+          onLogin(demoSupervisorUser);
+          return;
+        }
+        throw new Error(response.error || 'Login failed');
       }
     } catch (err) {
       // If API is completely unavailable, try demo mode
@@ -82,9 +104,28 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
           secureId: 'ADM001',
           employeeNumber: 'EMP001',
           isActive: true,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          department: 'Administration'
         };
         onLogin(demoAdminUser);
+        return;
+      }
+      if (formData.identifier.toLowerCase() === 'supervisor' && formData.password === 'supervisor123') {
+        const demoSupervisorUser = {
+          id: 'supervisor-1',
+          name: 'Demo Supervisor',
+          email: 'supervisor@ehub.com',
+          role: 'supervisor' as const,
+          school: 'Ehub University',
+          phone: '+63 987 654 3210',
+          gcashNumber: '09987654321',
+          secureId: 'SUP001',
+          employeeNumber: 'EMP101',
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          department: 'Demo Department'
+        };
+        onLogin(demoSupervisorUser);
         return;
       }
       setError(err instanceof Error ? err.message : 'Login failed');

@@ -51,34 +51,34 @@
   --card-foreground: #FFFFFF;
   --popover: #1a2332;
   --popover-foreground: #FFFFFF;
-  --primary: #E1862D;
+  --primary: #103054;
   --primary-foreground: #FFFFFF;
   --secondary: #1a4572;
   --secondary-foreground: #FFFFFF;
   --muted: #1e293b;
   --muted-foreground: #94A3B8;
-  --accent: #E1862D;
+  --accent: #103054;
   --accent-foreground: #FFFFFF;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
   --border: #2d3748;
   --input: #2d3748;
-  --ring: #E1862D;
+  --ring: #103054;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --chart-1: #E1862D;
+  --chart-1: #103054;
   --chart-2: #3B82F6;
   --chart-3: #10B981;
   --chart-4: #F59E0B;
   --chart-5: #8B5CF6;
   --sidebar: #103054;
   --sidebar-foreground: #FFFFFF;
-  --sidebar-primary: #E1862D;
+  --sidebar-primary: #103054;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #1a4572;
   --sidebar-accent-foreground: #FFFFFF;
   --sidebar-border: #1a4572;
-  --sidebar-ring: #E1862D;
+  --sidebar-ring: #103054;
 }
 
 @theme inline {
@@ -256,7 +256,7 @@ html {
 }
 
 .hover-glow:hover {
-  box-shadow: 0 0 20px rgba(225, 134, 45, 0.4);
+  box-shadow: 0 0 20px rgba(16, 48, 84, 0.4);
 }
 
 .hover-scale {
@@ -327,11 +327,11 @@ html {
 
   0%,
   100% {
-    box-shadow: 0 0 5px rgba(225, 134, 45, 0.3);
+    box-shadow: 0 0 5px rgba(16, 48, 84, 0.3);
   }
 
   50% {
-    box-shadow: 0 0 20px rgba(225, 134, 45, 0.6);
+    box-shadow: 0 0 20px rgba(16, 48, 84, 0.6);
   }
 }
 

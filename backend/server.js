@@ -16,7 +16,9 @@ app.use(helmet());
 // CORS configuration for network access
 const allowedOrigins = [
     'http://localhost:5173',
+    'http://localhost:3000',
     'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
     process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -208,7 +210,7 @@ async function initializeDatabase() {
         );
 
         if (newAdminUsers.length === 0) {
-            const newAdminPassword = await bcrypt.hash('administrator', 10);
+            const newAdminPassword = await bcrypt.hash('admin123', 10);
             await connection.execute(`
         INSERT INTO users (id, name, email, password_hash, role, secure_id, employee_number, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -222,6 +224,12 @@ async function initializeDatabase() {
                 'EMP002',
                 true
             ]);
+        } else {
+            // Update existing admin user password if needed
+            const newAdminPassword = await bcrypt.hash('admin123', 10);
+            await connection.execute(`
+        UPDATE users SET password_hash = ? WHERE email = ? AND role = ?
+      `, [newAdminPassword, 'admin@ehub.ph', 'admin']);
         }
 
         // Create sample supervisor and fabricator users
@@ -350,7 +358,7 @@ app.post('/api/auth/login', async (req, res) => {
 
         // Check for admin login with hardcoded credentials
         if ((identifier === 'admin' && password === 'admin123') ||
-            (identifier === 'admin@ehub.ph' && password === 'administrator')) {
+            (identifier === 'admin@ehub.ph' && password === 'admin123')) {
 
             // Find the specific admin user based on identifier
             let adminUser;
@@ -378,6 +386,41 @@ app.post('/api/auth/login', async (req, res) => {
                 connection.release();
                 return res.json({
                     user: { ...adminUser, password_hash: undefined },
+                    token
+                });
+            }
+        }
+
+        // Check for supervisor login with hardcoded credentials
+        if ((identifier.toLowerCase() === 'supervisor' && password === 'supervisor123') ||
+            (identifier === 'supervisor@ehub.ph' && password === 'supervisor123')) {
+
+            // Find the specific supervisor user based on identifier
+            let supervisorUser;
+            if (identifier === 'supervisor@ehub.ph') {
+                const [users] = await connection.execute(
+                    'SELECT * FROM users WHERE email = ? AND role = ? AND is_active = ?',
+                    ['supervisor@ehub.ph', 'supervisor', true]
+                );
+                supervisorUser = users[0];
+            } else {
+                const [users] = await connection.execute(
+                    'SELECT * FROM users WHERE role = ? AND is_active = ?',
+                    ['supervisor', true]
+                );
+                supervisorUser = users[0];
+            }
+
+            if (supervisorUser) {
+                const token = jwt.sign(
+                    { id: supervisorUser.id, role: supervisorUser.role, email: supervisorUser.email },
+                    JWT_SECRET,
+                    { expiresIn: '24h' }
+                );
+
+                connection.release();
+                return res.json({
+                    user: { ...supervisorUser, password_hash: undefined },
                     token
                 });
             }

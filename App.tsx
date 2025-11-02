@@ -16,14 +16,17 @@ import { TaskManager } from './components/tasks/TaskManager';
 import { ReportsManager } from './components/reports/ReportsManager';
 import { ProjectArchives } from './components/archives/ProjectArchives';
 import { ClientDashboard } from './components/client/ClientDashboard';
-import { AnimationExamples } from './components/ui/AnimationExamples';
+import { AdminProjectsManager } from './components/admin/AdminProjectsManager';
+import { AdminTasksManager } from './components/admin/AdminTasksManager';
 import { User, Task, Project, WorkLogEntry, Material, ProjectAssignment } from './types';
 import { mockUsers, mockProjects, mockTasks, mockCompanyRevenue, mockWorkLogs, mockMaterials } from './data/mockData';
+import { mapProjectsFromBackend } from './utils/projectDataMapper';
+import { mapUserDataFromBackend } from './utils/userDataMapper';
 import { emailService } from './utils/emailService';
 import { apiService } from './utils/apiService';
 import { useTimeBasedTheme } from './hooks/useTimeBasedTheme';
 
-type ViewType = 'dashboard' | 'projects' | 'tasks' | 'users' | 'materials' | 'reports' | 'settings' | 'team' | 'worklog' | 'revenue' | 'assignments' | 'archives' | 'project-status' | 'documentation' | 'animations';
+type ViewType = 'dashboard' | 'projects' | 'tasks' | 'users' | 'materials' | 'reports' | 'settings' | 'team' | 'worklog' | 'revenue' | 'assignments' | 'archives' | 'project-status' | 'documentation' | 'admin-projects' | 'admin-tasks';
 type AuthView = 'main' | 'fabricator-signup' | 'forgot-password';
 
 export default function App() {
@@ -36,34 +39,77 @@ export default function App() {
   const [workLogs, setWorkLogs] = useState(mockWorkLogs);
   const [materials, setMaterials] = useState(mockMaterials);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [backendHealthy, setBackendHealthy] = useState<boolean | null>(null);
+  const [lastReloadAt, setLastReloadAt] = useState<number>(0);
 
   // Initialize time-based theme
   const { isDark, isTransitioning, setTheme, getCurrentTheme } = useTimeBasedTheme();
 
-  // Initialize database and load data
+  // Initialize: restore session and view, then database and data
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Restore session
+        try {
+          const storedUser = localStorage.getItem('currentUser');
+          if (storedUser) {
+            const parsed = JSON.parse(storedUser) as User;
+            setCurrentUser(parsed);
+          }
+          const hash = (window.location.hash || '').slice(1);
+          if (!hash) {
+            // Default to dashboard for signed-in users
+            if (storedUser) {
+              setCurrentView('dashboard');
+              try { window.location.hash = 'dashboard'; } catch {}
+            }
+          }
+        } catch {}
+
         // Check if backend is available
         const healthCheck = await apiService.healthCheck();
         if (healthCheck.error) {
           console.warn('Backend not available. Running in demo mode with local data.');
+          setBackendHealthy(false);
           setIsInitialized(true);
           return;
         }
 
         // Load data from database
         await loadDataFromDatabase();
+        setBackendHealthy(true);
         setIsInitialized(true);
       } catch (error) {
         console.error('Failed to initialize app:', error);
         console.warn('Falling back to demo mode with local data.');
+        setBackendHealthy(false);
         setIsInitialized(true); // Continue with local data
       }
     };
 
     initializeApp();
   }, []);
+
+  // Enforce role-based access to views and normalize to dashboard if disallowed
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const role = currentUser.role;
+    const allowedByRole: Record<User['role'], ReadonlyArray<ViewType>> = {
+      admin: ['dashboard', 'projects', 'tasks', 'users', 'materials', 'reports', 'settings', 'team', 'revenue', 'assignments', 'archives'],
+      supervisor: ['dashboard', 'projects', 'tasks', 'team', 'reports', 'archives'],
+      fabricator: ['dashboard', 'projects', 'assignments', 'worklog', 'materials', 'tasks'],
+      client: ['dashboard', 'project-status', 'documentation'],
+    } as const;
+
+    const allowed = allowedByRole[role] || ['dashboard'];
+    if (!allowed.includes(currentView)) {
+      setCurrentView('dashboard');
+      try {
+        window.location.hash = 'dashboard';
+      } catch {}
+    }
+  }, [currentUser, currentView]);
 
   const loadDataFromDatabase = async () => {
     try {
@@ -76,7 +122,7 @@ export default function App() {
       ]);
 
       if (projectsRes.data) {
-        setProjects(projectsRes.data);
+        setProjects(mapProjectsFromBackend(projectsRes.data));
       }
 
       if (tasksRes.data) {
@@ -92,7 +138,7 @@ export default function App() {
       }
 
       if (usersRes.data) {
-        setUsers(usersRes.data);
+        setUsers(usersRes.data.map(mapUserDataFromBackend));
       }
     } catch (error) {
       console.error('Failed to load data from database:', error);
@@ -101,7 +147,11 @@ export default function App() {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
+    try { localStorage.setItem('currentUser', JSON.stringify(user)); } catch {}
     setCurrentView('dashboard');
+    try {
+      window.location.hash = 'dashboard';
+    } catch {}
   };
 
   const handleLogout = () => {
@@ -109,6 +159,10 @@ export default function App() {
     setCurrentUser(null);
     setCurrentView('dashboard');
     setAuthView('main');
+    try { localStorage.removeItem('currentUser'); } catch {}
+    try {
+      window.location.hash = 'dashboard';
+    } catch {}
   };
 
   const handleSignup = (newUser: User) => {
@@ -116,7 +170,13 @@ export default function App() {
     setUsers(prevUsers => [...prevUsers, newUser]);
     // Log them in immediately
     setCurrentUser(newUser);
+    try { localStorage.setItem('currentUser', JSON.stringify(newUser)); } catch {}
     setCurrentView('dashboard');
+  };
+
+  // Add user to list without changing the current session (for admin creating clients)
+  const handleAddUser = (newUser: User) => {
+    setUsers(prevUsers => [...prevUsers, newUser]);
   };
 
   const handleShowFabricatorSignup = () => {
@@ -168,8 +228,10 @@ export default function App() {
       const response = await apiService.createProject(projectData);
 
       if (response.data) {
-        setProjects(prevProjects => [...prevProjects, response.data]);
-        return response.data;
+        // Normalize backend response to frontend shape
+        const mapped = mapProjectsFromBackend([response.data])[0];
+        setProjects(prevProjects => [...prevProjects, mapped]);
+        return mapped;
       } else {
         throw new Error(response.error || 'Failed to create project');
       }
@@ -326,12 +388,18 @@ export default function App() {
     setTasks(prevTasks => [...prevTasks, ...newTasks]);
   };
 
-  const handleUpdateProject = (updatedProject: Project) => {
+  const handleUpdateProject = async (updatedProject: Project) => {
+    // Optimistic update for responsiveness
     setProjects(prevProjects =>
-      prevProjects.map(p =>
-        p.id === updatedProject.id ? updatedProject : p
-      )
+      prevProjects.map(p => (p.id === updatedProject.id ? updatedProject : p))
     );
+
+    // Persist in background; keep UI responsive
+    try {
+      await apiService.updateProject(updatedProject.id, updatedProject);
+    } catch (e) {
+      console.warn('Failed to persist project update; will retry on next refresh.', e);
+    }
 
     // Send email notification about project update
     if (currentUser) {
@@ -339,20 +407,161 @@ export default function App() {
     }
   };
 
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      const response = await apiService.deleteProject(projectId);
+      if (!response.error) {
+        setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+      } else {
+        throw new Error(response.error);
+      }
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      // Still remove from UI on error for better UX (could add toast notification here)
+      setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+    }
+  };
+
   // Handle navigation based on URL hash
   useEffect(() => {
+    const validViews = [
+      'dashboard',
+      'projects',
+      'tasks',
+      'users',
+      'materials',
+      'reports',
+      'settings',
+      'team',
+      'worklog',
+      'revenue',
+      'assignments',
+      'archives',
+      'project-status',
+      'documentation',
+      'admin-projects',
+      'admin-tasks',
+    ] as const;
+
     const handleHashChange = () => {
-      const hash = window.location.hash.slice(1) as ViewType;
-      if (hash && ['dashboard', 'projects', 'tasks', 'users', 'materials', 'reports', 'settings', 'team', 'worklog', 'revenue', 'assignments', 'archives', 'project-status', 'documentation', 'animations'].includes(hash)) {
-        setCurrentView(hash);
+      const rawHash = window.location.hash.slice(1);
+      // Redirect admin-projects and admin-tasks to projects
+      if (rawHash === 'admin-projects' || rawHash === 'admin-tasks') {
+        window.location.hash = 'projects';
+        setCurrentView('projects');
+        try { localStorage.setItem('currentView', 'projects'); } catch {}
+        return;
+      }
+      // Redirect fabricators from assignments to projects
+      if (rawHash === 'assignments' && currentUser?.role === 'fabricator') {
+        window.location.hash = 'projects';
+        setCurrentView('projects');
+        try { localStorage.setItem('currentView', 'projects'); } catch {}
+        return;
+      }
+      if (validViews.includes(rawHash as typeof validViews[number])) {
+        setCurrentView(rawHash as ViewType);
+        try { localStorage.setItem('currentView', rawHash); } catch {}
+      } else if (!rawHash) {
+        // Default to dashboard when no hash is present
+        setCurrentView('dashboard');
+        try { localStorage.setItem('currentView', 'dashboard'); } catch {}
       }
     };
 
     window.addEventListener('hashchange', handleHashChange);
-    handleHashChange(); // Handle initial hash
+    // Also update immediately on in-app anchor clicks to be resilient to UI wrappers
+    const handleAnchorClick = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const anchor = target.closest('a[href^="#"]') as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const raw = anchor.getAttribute('href') || '';
+      const view = raw.startsWith('#') ? raw.slice(1) : raw;
+      if (validViews.includes(view as typeof validViews[number])) {
+        setCurrentView(view as ViewType);
+      }
+    };
+    document.addEventListener('click', handleAnchorClick);
+    // On first load, prefer hash; else restore last view for signed-in user
+    const rawHash = window.location.hash.slice(1);
+    if (validViews.includes(rawHash as typeof validViews[number])) {
+      handleHashChange();
+    } else {
+      try {
+        const storedUser = localStorage.getItem('currentUser');
+        const storedView = localStorage.getItem('currentView') as ViewType | null;
+        if (storedUser) {
+          const view = storedView && (validViews as readonly string[]).includes(storedView)
+            ? storedView
+            : 'dashboard';
+          setCurrentView(view as ViewType);
+          if (!rawHash) { try { window.location.hash = view; } catch {} }
+        }
+      } catch {}
+    }
 
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      document.removeEventListener('click', handleAnchorClick);
+    };
   }, []);
+
+  // Periodically check backend health and auto-reload data when it comes back
+  useEffect(() => {
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await apiService.healthCheck();
+        const healthy = !res.error;
+        if (!isMounted) return;
+        setBackendHealthy(prev => {
+          // Transition from unhealthy -> healthy: reload data
+          if (prev === false && healthy) {
+            loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => {});
+          }
+          return healthy;
+        });
+      } catch {
+        if (!isMounted) return;
+        setBackendHealthy(false);
+      }
+    }, 20000); // 20s
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Refresh when tab gains focus or when coming back online
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && backendHealthy) {
+        // Avoid excessive reloads: only if >10s since last reload
+        if (Date.now() - lastReloadAt > 10000) {
+          loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => {});
+        }
+      }
+    };
+    const handleOnline = () => {
+      // Give the backend a moment, then check and reload
+      setTimeout(async () => {
+        const res = await apiService.healthCheck();
+        const healthy = !res.error;
+        setBackendHealthy(healthy);
+        if (healthy) {
+          loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => {});
+        }
+      }, 1000);
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [backendHealthy, lastReloadAt]);
 
   if (!currentUser) {
     switch (authView) {
@@ -443,7 +652,9 @@ export default function App() {
             onCreateProject={(currentUser.role === 'admin' || currentUser.role === 'supervisor') ? handleCreateProject : undefined}
             onAssignFabricator={currentUser.role === 'supervisor' ? handleAssignFabricator : undefined}
             onUpdateProject={handleUpdateProject}
-            onCreateUser={handleSignup}
+            onAcceptAssignment={currentUser.role === 'fabricator' ? handleAcceptAssignment : undefined}
+            onDeclineAssignment={currentUser.role === 'fabricator' ? handleDeclineAssignment : undefined}
+            onCreateUser={handleAddUser}
           />
         );
 
@@ -471,14 +682,22 @@ export default function App() {
         );
 
       case 'assignments':
+        // Redirect fabricators to projects (assignments merged into projects)
         if (currentUser.role === 'fabricator') {
+          if (typeof window !== 'undefined') {
+            window.location.hash = 'projects';
+          }
           return (
-            <ProjectAssignments
-              currentUser={currentUser}
+            <ProjectsGrid
               projects={projects}
               users={users}
+              currentUser={currentUser}
+              onCreateProject={(currentUser.role === 'admin' || currentUser.role === 'supervisor') ? handleCreateProject : undefined}
+              onAssignFabricator={currentUser.role === 'supervisor' ? handleAssignFabricator : undefined}
+              onUpdateProject={handleUpdateProject}
               onAcceptAssignment={handleAcceptAssignment}
               onDeclineAssignment={handleDeclineAssignment}
+              onCreateUser={handleAddUser}
             />
           );
         }
@@ -502,6 +721,7 @@ export default function App() {
               workLogs={workLogs}
               materials={materials}
               onAddWorkLog={handleAddWorkLog}
+              onUpdateProject={handleUpdateProject}
             />
           );
         }
@@ -579,8 +799,21 @@ export default function App() {
           />
         );
 
-      case 'animations':
-        return <AnimationExamples />;
+      case 'admin-projects':
+      case 'admin-tasks':
+        // These routes redirect to projects via hash change handler
+        // Fall through to projects view
+        return (
+          <ProjectsGrid
+            projects={projects}
+            users={users}
+            currentUser={currentUser}
+            onCreateProject={(currentUser.role === 'admin' || currentUser.role === 'supervisor') ? handleCreateProject : undefined}
+            onAssignFabricator={currentUser.role === 'supervisor' ? handleAssignFabricator : undefined}
+            onUpdateProject={handleUpdateProject}
+            onCreateUser={handleAddUser}
+          />
+        );
 
       default:
         return (

@@ -1,5 +1,9 @@
 // API Service for MySQL/Express backend
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3002/api';
+// Prefer configured URL; otherwise infer host so mobile devices on the same LAN can reach the API
+const inferredHost = (typeof window !== 'undefined' && window.location && window.location.hostname)
+  ? window.location.hostname
+  : 'localhost';
+const API_BASE_URL = process.env.REACT_APP_API_URL || `http://${inferredHost}:3002/api`;
 
 interface ApiResponse<T> {
     data?: T;
@@ -19,7 +23,8 @@ class ApiService {
 
     private async request<T>(
         endpoint: string,
-        options: RequestInit = {}
+        options: RequestInit = {},
+        retryCount: number = 0
     ): Promise<ApiResponse<T>> {
         const url = `${this.baseUrl}${endpoint}`;
         const headers: HeadersInit = {
@@ -37,6 +42,21 @@ class ApiService {
                 headers,
             });
 
+            if (response.status === 429) {
+                // Too Many Requests: honor Retry-After when available
+                const retryAfterHeader = response.headers.get('Retry-After');
+                const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : NaN;
+                const retryAfterMs = Number.isFinite(retryAfterSeconds)
+                    ? Math.min(Math.max(retryAfterSeconds, 1), 30) * 1000
+                    : Math.min(1000 * Math.pow(2, retryCount), 8000);
+
+                if (retryCount < 3) {
+                    await new Promise((r) => setTimeout(r, retryAfterMs));
+                    return this.request<T>(endpoint, options, retryCount + 1);
+                }
+                return { error: 'Too many requests. Please try again shortly.' };
+            }
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.error || `HTTP ${response.status}`);
@@ -45,6 +65,12 @@ class ApiService {
             const data = await response.json();
             return { data };
         } catch (error) {
+            // Network-level retry (e.g., brief disconnect) with capped backoff
+            if (retryCount < 2) {
+                const backoffMs = Math.min(1000 * Math.pow(2, retryCount), 4000);
+                await new Promise((r) => setTimeout(r, backoffMs));
+                return this.request<T>(endpoint, options, retryCount + 1);
+            }
             console.error(`API request failed for ${endpoint}:`, error);
             return { error: error instanceof Error ? error.message : 'Unknown error' };
         }
@@ -112,6 +138,12 @@ class ApiService {
         return this.request(`/projects/${projectId}`, {
             method: 'PUT',
             body: JSON.stringify(updates),
+        });
+    }
+
+    async deleteProject(projectId: string): Promise<ApiResponse<any>> {
+        return this.request(`/projects/${projectId}`, {
+            method: 'DELETE',
         });
     }
 

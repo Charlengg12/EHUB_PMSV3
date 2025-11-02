@@ -27,6 +27,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
   const [createdClient, setCreatedClient] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const isAssigned = !!(project.clientName && project.clientName.trim().length > 0);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -64,7 +65,10 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    if (isAssigned) {
+      setErrors({ submit: 'A client is already assigned to this project.' });
+      return;
+    }
     if (!validateForm()) {
       return;
     }
@@ -207,6 +211,13 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isAssigned && (
+            <Alert>
+              <AlertDescription>
+                A client is already assigned to this project ({project.clientName}). You cannot create another client.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="space-y-2">
             <Label htmlFor="name">Client Name *</Label>
             <Input
@@ -215,6 +226,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
               className={errors.name ? 'border-destructive' : ''}
+              disabled={isAssigned}
             />
             {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
           </div>
@@ -228,6 +240,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
               className={errors.email ? 'border-destructive' : ''}
+              disabled={isAssigned}
             />
             {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
           </div>
@@ -241,6 +254,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
               value={formData.phone}
               onChange={(e) => handleInputChange('phone', e.target.value)}
               className={errors.phone ? 'border-destructive' : ''}
+              disabled={isAssigned}
             />
             {errors.phone && <p className="text-sm text-destructive">{errors.phone}</p>}
           </div>
@@ -255,6 +269,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
                 className={errors.password ? 'border-destructive' : ''}
+                disabled={isAssigned}
               />
               <Button
                 type="button"
@@ -262,6 +277,7 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isAssigned}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
@@ -285,8 +301,10 @@ export function ClientCreationDialog({ open, onClose, project, onClientCreated }
             <Button type="button" variant="outline" onClick={handleClose} className="flex-1">
               Cancel
             </Button>
-            <Button type="submit" className="flex-1" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" className="flex-1" disabled={isLoading || isAssigned}>
+              {isAssigned ? (
+                <>Client Assigned</>
+              ) : isLoading ? (
                 <>
                   <div className="h-4 w-4 animate-spin border-2 border-white border-t-transparent rounded-full mr-2" />
                   Creating...

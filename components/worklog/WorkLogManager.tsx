@@ -6,18 +6,12 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { Progress } from '../ui/progress';
-import { Separator } from '../ui/separator';
-import { 
-  Clock, 
-  Calendar, 
-  FileText, 
-  Plus, 
-  TrendingUp, 
-  Package,
-  Camera,
-  Edit,
-  Trash2
+import {
+  Calendar,
+  FileText,
+  Plus,
+  TrendingUp,
+  Package
 } from 'lucide-react';
 import { Project, User, WorkLogEntry, Material } from '../../types';
 
@@ -29,39 +23,38 @@ interface WorkLogManagerProps {
   onAddWorkLog: (workLog: Omit<WorkLogEntry, 'id' | 'createdAt'>) => void;
   onUpdateWorkLog?: (id: string, workLog: Partial<WorkLogEntry>) => void;
   onDeleteWorkLog?: (id: string) => void;
+  onUpdateProject?: (project: Project) => void;
 }
 
-export function WorkLogManager({ 
-  currentUser, 
-  projects, 
-  workLogs, 
+export function WorkLogManager({
+  currentUser,
+  projects,
+  workLogs,
   materials,
   onAddWorkLog,
-  onUpdateWorkLog,
-  onDeleteWorkLog
+  onUpdateProject
 }: WorkLogManagerProps) {
   const [selectedProject, setSelectedProject] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    hoursWorked: '',
     description: '',
     progressPercentage: '',
     materialsUsed: [] as string[]
   });
 
   // Filter projects for current fabricator
-  const fabricatorProjects = projects.filter(p => 
+  const fabricatorProjects = projects.filter(p =>
     p.fabricatorIds.includes(currentUser.id) && p.status !== 'pending-assignment'
   );
 
   // Filter work logs for selected project and current user
-  const filteredWorkLogs = selectedProject 
+  const filteredWorkLogs = selectedProject
     ? workLogs.filter(wl => wl.projectId === selectedProject && wl.fabricatorId === currentUser.id)
     : workLogs.filter(wl => wl.fabricatorId === currentUser.id);
 
   // Get available materials for selected project
-  const projectMaterials = selectedProject 
+  const projectMaterials = selectedProject
     ? materials.filter(m => m.projectId === selectedProject || !m.projectId)
     : materials;
 
@@ -80,7 +73,7 @@ export function WorkLogManager({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedProject) {
       alert('Please select a project first');
       return;
@@ -90,7 +83,7 @@ export function WorkLogManager({
       projectId: selectedProject,
       fabricatorId: currentUser.id,
       date: formData.date,
-      hoursWorked: parseFloat(formData.hoursWorked),
+      hoursWorked: 0,
       description: formData.description,
       progressPercentage: parseInt(formData.progressPercentage),
       materials: formData.materialsUsed.length > 0 ? formData.materialsUsed : undefined
@@ -101,7 +94,6 @@ export function WorkLogManager({
     // Reset form
     setFormData({
       date: new Date().toISOString().split('T')[0],
-      hoursWorked: '',
       description: '',
       progressPercentage: '',
       materialsUsed: []
@@ -114,8 +106,56 @@ export function WorkLogManager({
     return project?.progress || 0;
   };
 
-  const getTotalHours = () => {
-    return filteredWorkLogs.reduce((total, log) => total + log.hoursWorked, 0);
+  const getSelectedProject = () => projects.find(p => p.id === selectedProject);
+  const hasDocumentation = () => {
+    const proj = getSelectedProject();
+    if (!proj) return false;
+    const hasFiles = Array.isArray(proj.attachments) && proj.attachments.length > 0;
+    const hasLink = !!proj.documentationUrl && proj.documentationUrl.trim().length > 0;
+    return hasFiles || hasLink;
+  };
+  const canSubmitForReview = () => {
+    const proj = getSelectedProject();
+    if (!proj) return false;
+
+    // Check all conditions explicitly
+    // Allow submission if status is one where fabricator is actively working
+    const validStatuses = ['1_Assigned_to_FAB', 'in-progress', 'planning'];
+    const hasStatus = validStatuses.includes(proj.status);
+
+    // Exclude statuses where already in review or completed
+    const invalidStatuses = [
+      '2_Ready_for_Supervisor_Review',
+      '3_Ready_for_Admin_Review',
+      '4_Ready_for_Client_Signoff',
+      'completed',
+      'on-hold'
+    ];
+    const hasInvalidStatus = invalidStatuses.includes(proj.status);
+
+    const hasDocs = hasDocumentation();
+    const hasProgress = proj.progress >= 100;
+
+    // Debug logging (can be removed later)
+    console.log('Submit button check:', {
+      projectId: proj.id,
+      status: proj.status,
+      statusMatch: hasStatus && !hasInvalidStatus,
+      progress: proj.progress,
+      hasProgress: hasProgress,
+      hasDocs: hasDocs,
+      attachments: proj.attachments?.length || 0,
+      docUrl: proj.documentationUrl,
+      canSubmit: hasStatus && !hasInvalidStatus && hasDocs && hasProgress
+    });
+
+    return hasStatus && !hasInvalidStatus && hasDocs && hasProgress;
+  };
+  const submitForSupervisorReview = () => {
+    const proj = getSelectedProject();
+    if (!proj || !onUpdateProject) return;
+    const updated: Project = { ...proj, status: '2_Ready_for_Supervisor_Review' };
+    onUpdateProject(updated);
   };
 
   const getProjectName = (projectId: string) => {
@@ -175,16 +215,6 @@ export function WorkLogManager({
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Total Hours</span>
-              </div>
-              <p className="text-2xl">{getTotalHours()}</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">Project Progress</span>
               </div>
@@ -199,6 +229,16 @@ export function WorkLogManager({
                 <span className="text-sm">Work Entries</span>
               </div>
               <p className="text-2xl">{filteredWorkLogs.length}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Documentation</span>
+              </div>
+              <p className="text-2xl">{hasDocumentation() ? 'Ready' : 'Missing'}</p>
             </CardContent>
           </Card>
         </div>
@@ -220,20 +260,6 @@ export function WorkLogManager({
                     type="date"
                     value={formData.date}
                     onChange={(e) => handleInputChange('date', e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="hours">Hours Worked</Label>
-                  <Input
-                    id="hours"
-                    type="number"
-                    min="0"
-                    step="0.5"
-                    placeholder="8.0"
-                    value={formData.hoursWorked}
-                    onChange={(e) => handleInputChange('hoursWorked', e.target.value)}
                     required
                   />
                 </div>
@@ -280,7 +306,7 @@ export function WorkLogManager({
                         onChange={() => handleMaterialToggle(material.name)}
                         className="rounded"
                       />
-                      <Label 
+                      <Label
                         htmlFor={`material-${material.id}`}
                         className="text-sm cursor-pointer"
                       >
@@ -305,6 +331,69 @@ export function WorkLogManager({
         </Card>
       )}
 
+      {/* Submit for Supervisor Review */}
+      {selectedProject && (
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground space-y-1">
+                <div>Upload files in the Project Details → Files or add a documentation link.</div>
+                {(() => {
+                  const proj = getSelectedProject();
+                  if (!proj) return null;
+                  const missingRequirements = [];
+                  if (!hasDocumentation()) missingRequirements.push('documentation');
+                  if (proj.progress < 100) missingRequirements.push('100% progress');
+                  if (proj.status !== '1_Assigned_to_FAB') missingRequirements.push('correct status');
+
+                  return (
+                    <div className="text-xs space-y-1">
+                      <div>
+                        Progress: <strong>{proj.progress}%</strong> {proj.progress < 100 && '(Must be 100% to submit)'}
+                      </div>
+                      <div>
+                        Status: <strong>{proj.status}</strong> {
+                          !['1_Assigned_to_FAB', 'in-progress', 'planning'].includes(proj.status) &&
+                          !['2_Ready_for_Supervisor_Review', '3_Ready_for_Admin_Review', '4_Ready_for_Client_Signoff', 'completed', 'on-hold'].includes(proj.status) &&
+                          '(Status must allow submission)'
+                        }
+                      </div>
+                      <div>
+                        Documentation: <strong>{hasDocumentation() ? 'Ready' : 'Missing'}</strong>
+                        {!hasDocumentation() && (
+                          <span className="ml-1">({proj.attachments?.length || 0} files, {proj.documentationUrl ? 'has link' : 'no link'})</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <Button
+                onClick={submitForSupervisorReview}
+                disabled={!canSubmitForReview()}
+                className={canSubmitForReview() ? 'bg-green-600 hover:bg-green-700' : ''}
+                title={
+                  (() => {
+                    const proj = getSelectedProject();
+                    if (!proj) return 'Select a project first';
+                    const validStatuses = ['1_Assigned_to_FAB', 'in-progress', 'planning'];
+                    const invalidStatuses = ['2_Ready_for_Supervisor_Review', '3_Ready_for_Admin_Review', '4_Ready_for_Client_Signoff', 'completed', 'on-hold'];
+                    if (!validStatuses.includes(proj.status) || invalidStatuses.includes(proj.status)) {
+                      return `Status must allow submission (currently: ${proj.status})`;
+                    }
+                    if (!hasDocumentation()) return 'Add documentation (files or link) before submitting';
+                    if (proj.progress < 100) return `Progress must be 100% (currently: ${proj.progress}%)`;
+                    return 'Click to submit for supervisor review';
+                  })()
+                }
+              >
+                Submit for Supervisor Review
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Work Log History */}
       <Card>
         <CardHeader>
@@ -324,7 +413,7 @@ export function WorkLogManager({
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg mb-2">No work logs found</h3>
               <p className="text-muted-foreground">
-                {selectedProject 
+                {selectedProject
                   ? 'Start logging your work progress for this project.'
                   : 'Select a project to view your work logs.'
                 }
@@ -341,9 +430,7 @@ export function WorkLogManager({
                         <div className="text-sm text-muted-foreground">
                           {new Date(log.date).toLocaleDateString()}
                         </div>
-                        <Badge variant="secondary">
-                          {log.hoursWorked}h worked
-                        </Badge>
+
                         <Badge variant="outline">
                           +{log.progressPercentage}% progress
                         </Badge>

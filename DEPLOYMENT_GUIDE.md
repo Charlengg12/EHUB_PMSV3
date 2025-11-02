@@ -1,10 +1,196 @@
 # Ehub PMS Deployment Guide
 
-## 🚀 Local Network Setup
+Complete guide for deploying Ehub Project Management System in various environments, from local development to scalable production deployments.
 
-### 1. Configure Environment Variables
+## Table of Contents
 
-Create a `.env` file in the root directory:
+- [Quick Start](#quick-start)
+- [Docker Deployment](#docker-deployment) ⭐ Recommended
+- [Local Development](#local-development)
+- [Production Deployment](#production-deployment)
+- [Scaling & Performance](#scaling--performance)
+- [Security Checklist](#security-checklist)
+- [Monitoring & Maintenance](#monitoring--maintenance)
+
+---
+
+## Quick Start
+
+### Option 1: Docker (Recommended)
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd EHUB_PMSV3
+
+# Copy environment template
+cp env.production.template .env
+
+# Edit .env with your settings
+nano .env
+
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+**Access:**
+- Frontend: http://localhost:80
+- Backend API: http://localhost:3002/api
+- Health Check: http://localhost:3002/api/health
+
+### Option 2: Manual Setup
+
+See [Local Development](#local-development) section below.
+
+---
+
+## Docker Deployment
+
+### Prerequisites
+
+- Docker Engine 20.10+ or Docker Desktop
+- Docker Compose 2.0+
+- 4GB RAM minimum (8GB recommended for production)
+
+### Basic Setup
+
+1. **Configure Environment Variables**
+
+```bash
+cp env.production.template .env
+```
+
+Edit `.env` with your production values:
+- Strong database password
+- Secure JWT secret (use `openssl rand -base64 32`)
+- Your domain URLs
+
+2. **Start Services**
+
+```bash
+# Development mode
+docker-compose up -d
+
+# Production mode with scaling
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+3. **Initialize Database**
+
+The database will auto-initialize on first start. You can also manually run:
+
+```bash
+docker-compose exec backend npm run setup
+```
+
+4. **Verify Deployment**
+
+```bash
+# Check all services are running
+docker-compose ps
+
+# Check logs
+docker-compose logs backend
+docker-compose logs frontend
+docker-compose logs mysql
+
+# Test API
+curl http://localhost:3002/api/health
+```
+
+### Production Deployment with Nginx
+
+For production with SSL/HTTPS support:
+
+```bash
+# Generate SSL certificates (Let's Encrypt recommended)
+# Place certificates in nginx/ssl/ directory
+
+# Start with nginx profile
+docker-compose --profile production up -d
+```
+
+### Scaling Backend Services
+
+Scale backend to handle more load:
+
+```bash
+# Scale backend to 3 instances
+docker-compose up -d --scale backend=3
+
+# With production config
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --scale backend=3
+```
+
+Nginx will automatically load balance across all backend instances.
+
+### Backup & Recovery
+
+```bash
+# Backup database
+docker-compose exec mysql mysqldump -u root -p${DB_PASSWORD} ehub_pms > backup_$(date +%Y%m%d).sql
+
+# Restore database
+docker-compose exec -T mysql mysql -u root -p${DB_PASSWORD} ehub_pms < backup_20240101.sql
+```
+
+### Docker Commands Reference
+
+```bash
+# View logs
+docker-compose logs -f [service_name]
+
+# Restart a service
+docker-compose restart [service_name]
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (⚠️ deletes data)
+docker-compose down -v
+
+# Update and rebuild
+docker-compose pull
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- MySQL 8.0+ (or use Docker for MySQL only)
+- 4GB RAM
+
+### Setup Steps
+
+1. **Clone and Install**
+
+```bash
+git clone <repository-url>
+cd EHUB_PMSV3
+
+# Install frontend dependencies
+npm install
+
+# Install backend dependencies
+cd backend
+npm install
+cd ..
+```
+
+2. **Configure Environment**
+
+Create `.env` file in root directory:
 
 ```bash
 # Database Configuration
@@ -14,217 +200,430 @@ DB_PASSWORD=your_mysql_password
 DB_NAME=ehub_pms
 DB_PORT=3306
 
-# JWT Secret (Change this in production!)
+# JWT Secret
 JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 
-# Frontend URL (Update with your local IP address)
-FRONTEND_URL=http://192.168.1.100:5173
+# Frontend URL
+FRONTEND_URL=http://localhost:5173
 
-# API URL (Update with your local IP address)
-REACT_APP_API_URL=http://192.168.1.100:3002/api
+# API URL
+REACT_APP_API_URL=http://localhost:3002/api
 
 # Server Configuration
 PORT=3002
 HOST=0.0.0.0
 ```
 
-### 2. Find Your Local IP Address
-
-**Windows:**
-```cmd
-ipconfig
-```
-
-**Mac/Linux:**
-```bash
-ifconfig | grep "inet " | grep -v 127.0.0.1
-```
-
-Update the IP addresses in your `.env` file with your actual local IP.
-
-### 3. Install Dependencies and Setup Database
+3. **Setup Database**
 
 ```bash
-# Install backend dependencies
-cd backend
-npm install
-
-# Setup database
+# Option 1: Use setup script
 npm run setup
 
-# Install frontend dependencies
-cd ..
-npm install
+# Option 2: Manual SQL import
+mysql -u root -p < database/ehub_pms_deployment.sql
 ```
 
-### 4. Start the Application
+4. **Start Development Servers**
 
-**Option 1: Start both frontend and backend**
 ```bash
+# Option 1: Start both (recommended)
 npm run start:full
-```
 
-**Option 2: Start separately**
-```bash
+# Option 2: Separate terminals
 # Terminal 1 - Backend
-cd backend
-npm start
+cd backend && npm run dev
 
 # Terminal 2 - Frontend
 npm run dev
 ```
 
-### 5. Access from Other Devices
+5. **Access Application**
 
-Once running, other devices on your network can access:
-- **Frontend:** `http://YOUR_LOCAL_IP:5173`
-- **Backend API:** `http://YOUR_LOCAL_IP:3002`
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:3002/api
+- Health Check: http://localhost:3002/api/health
 
-## 🌐 Production Deployment
+---
 
-### 1. Database Setup (phpMyAdmin)
+## Production Deployment
 
-1. **Access your hosting control panel**
-2. **Open phpMyAdmin**
-3. **Create a new database:**
-   - Database name: `ehub_pms`
-   - Collation: `utf8mb4_unicode_ci`
+### Cloud Platform Deployment
 
-4. **Import the database structure:**
-   - Go to the `ehub_pms` database
-   - Click "Import" tab
-   - Upload the file: `database/ehub_pms_deployment.sql`
-   - Click "Go" to execute
+#### AWS (EC2 + RDS)
 
-### 2. Environment Configuration
+1. **Launch EC2 Instance**
+   - Ubuntu 22.04 LTS
+   - t3.medium or larger
+   - Security group: Allow ports 22, 80, 443, 3002
 
-Create a `.env` file on your server:
+2. **Install Docker**
 
 ```bash
-# Database Configuration (Use your hosting database details)
-DB_HOST=localhost
-DB_USER=your_hosting_db_user
-DB_PASSWORD=your_hosting_db_password
-DB_NAME=ehub_pms
-DB_PORT=3306
-
-# JWT Secret (Generate a strong secret)
-JWT_SECRET=your-very-strong-jwt-secret-for-production
-
-# Frontend URL (Your domain)
-FRONTEND_URL=https://yourdomain.com
-
-# API URL (Your domain)
-REACT_APP_API_URL=https://yourdomain.com/api
-
-# Server Configuration
-PORT=3002
-HOST=0.0.0.0
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+sudo usermod -aG docker $USER
+sudo systemctl enable docker
 ```
 
-### 3. File Upload
-
-Upload your project files to your hosting server:
-
-```
-/public_html/
-├── backend/
-│   ├── server.js
-│   ├── setup.js
-│   ├── package.json
-│   └── node_modules/ (after npm install)
-├── components/
-├── styles/
-├── public/
-├── index.html
-├── main.tsx
-├── App.tsx
-└── package.json
-```
-
-### 4. Build and Deploy
+3. **Deploy Application**
 
 ```bash
-# Build the frontend for production
-npm run build
+# Clone repository
+git clone <repository-url>
+cd EHUB_PMSV3
 
-# Install backend dependencies on server
-cd backend
-npm install --production
+# Configure environment
+cp env.production.template .env
+nano .env  # Update with RDS endpoint and credentials
 
-# Start the backend server
-npm start
+# Start services
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-### 5. Server Configuration
+4. **Configure Domain & SSL**
 
-**For cPanel/Shared Hosting:**
-- Upload files via File Manager
-- Set up Node.js application in cPanel
-- Configure environment variables
+Use AWS Application Load Balancer or Route53 with ACM certificates.
 
-**For VPS/Dedicated Server:**
-- Use PM2 for process management:
+#### DigitalOcean App Platform
+
+1. Connect GitHub repository
+2. Configure build settings:
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+3. Add environment variables
+4. Deploy
+
+#### Heroku
+
 ```bash
+# Install Heroku CLI
+heroku create ehub-pms
+
+# Set environment variables
+heroku config:set DB_HOST=...
+heroku config:set JWT_SECRET=...
+
+# Deploy
+git push heroku main
+```
+
+### Traditional VPS Deployment
+
+1. **Server Setup**
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+# Install Docker Compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+```
+
+2. **Deploy Application**
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd EHUB_PMSV3
+
+# Configure
+cp env.production.template .env
+nano .env
+
+# Deploy
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+3. **Setup SSL with Let's Encrypt**
+
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com
+```
+
+4. **Configure Firewall**
+
+```bash
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+```
+
+### Process Management (Without Docker)
+
+If deploying without Docker, use PM2:
+
+```bash
+# Install PM2
 npm install -g pm2
-pm2 start backend/server.js --name "ehub-pms"
+
+# Start backend
+cd backend
+pm2 start server.js --name ehub-pms-backend
+
+# Configure PM2 to start on boot
 pm2 startup
 pm2 save
+
+# Monitor
+pm2 status
+pm2 logs
 ```
 
-## 🔧 Default Login Credentials
+---
 
-After deployment, you can log in with:
+## Scaling & Performance
 
-- **Admin:** admin@ehub.com / admin123
-- **Supervisor:** supervisor@ehub.com / admin123
-- **Fabricator:** fabricator@ehub.com / admin123
-- **Client:** client@ehub.com / admin123
+### Horizontal Scaling
 
-**⚠️ Important:** Change these passwords immediately after first login!
-
-## 📱 Network Access Troubleshooting
-
-### Common Issues:
-
-1. **CORS Errors:**
-   - Ensure your local IP is correctly set in `.env`
-   - Check firewall settings
-
-2. **Database Connection:**
-   - Verify MySQL is running
-   - Check database credentials
-   - Ensure database exists
-
-3. **Port Access:**
-   - Check if ports 3002 and 5173 are open
-   - Verify firewall settings
-
-### Testing Network Access:
+#### Backend Scaling
 
 ```bash
-# Test backend API
-curl http://YOUR_LOCAL_IP:3002/api/health
+# Scale backend to multiple instances
+docker-compose up -d --scale backend=3
 
-# Test from another device
-# Open browser and go to: http://YOUR_LOCAL_IP:5173
+# Nginx automatically load balances
+# Each instance handles requests in round-robin
 ```
 
-## 🛡️ Security Considerations
+#### Database Scaling
 
-1. **Change default passwords**
-2. **Use strong JWT secrets**
-3. **Enable HTTPS in production**
-4. **Configure proper CORS origins**
-5. **Set up proper database user permissions**
-6. **Regular security updates**
+For high-traffic scenarios:
 
-## 📞 Support
+1. **Read Replicas**: Set up MySQL read replicas
+2. **Connection Pooling**: Already configured (max 200 connections)
+3. **Caching Layer**: Add Redis for session storage
 
-If you encounter issues:
-1. Check the console logs
-2. Verify all environment variables
-3. Test database connectivity
-4. Check network connectivity
-5. Review firewall settings
+```bash
+# Enable Redis caching
+docker-compose --profile caching up -d
+```
 
+### Vertical Scaling
+
+Increase resources in `docker-compose.prod.yml`:
+
+```yaml
+services:
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '2'      # Increase from 1
+          memory: 1G     # Increase from 512M
+```
+
+### Performance Optimization
+
+1. **Database Indexing**: Already configured on key columns
+2. **Query Optimization**: Use connection pooling (configured)
+3. **Static Asset Caching**: Configured in nginx
+4. **Gzip Compression**: Enabled in nginx
+5. **CDN**: Serve static assets via CDN (CloudFlare, AWS CloudFront)
+
+### Monitoring
+
+#### Health Checks
+
+All services include health checks:
+
+```bash
+# Check service health
+docker-compose ps
+
+# Manual health check
+curl http://localhost:3002/api/health
+```
+
+#### Log Management
+
+```bash
+# View logs
+docker-compose logs -f
+
+# Export logs
+docker-compose logs > logs_$(date +%Y%m%d).txt
+
+# Configure log rotation
+# Add to docker-compose.yml:
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+```
+
+---
+
+## Security Checklist
+
+### Before Production Deployment
+
+- [ ] Change all default passwords
+- [ ] Generate strong JWT secret (`openssl rand -base64 32`)
+- [ ] Use strong database password (min 16 characters)
+- [ ] Enable HTTPS/SSL certificates
+- [ ] Configure firewall (only open necessary ports)
+- [ ] Set up rate limiting (already configured in nginx)
+- [ ] Enable security headers (configured in nginx)
+- [ ] Regular security updates: `docker-compose pull`
+- [ ] Database backups automated
+- [ ] Environment variables secured (never commit to git)
+- [ ] CORS configured for your domain only
+- [ ] SQL injection protection (parameterized queries used)
+- [ ] XSS protection (input sanitization)
+
+### Security Best Practices
+
+1. **Secrets Management**
+   - Use environment variables
+   - Consider AWS Secrets Manager or HashiCorp Vault for production
+   - Never commit `.env` files
+
+2. **Database Security**
+   - Use least privilege database user
+   - Enable SSL for database connections
+   - Regular backups
+
+3. **API Security**
+   - Rate limiting enabled
+   - JWT token expiration (24h)
+   - Password hashing (bcrypt)
+
+---
+
+## Monitoring & Maintenance
+
+### Regular Maintenance Tasks
+
+1. **Weekly**
+   - Review application logs
+   - Check disk space
+   - Verify backups are running
+
+2. **Monthly**
+   - Update dependencies: `npm audit fix`
+   - Update Docker images: `docker-compose pull`
+   - Security patches: `apt update && apt upgrade`
+
+3. **Quarterly**
+   - Review and rotate secrets
+   - Performance optimization review
+   - Capacity planning
+
+### Backup Strategy
+
+```bash
+# Automated daily backup script
+#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+docker-compose exec -T mysql mysqldump -u root -p${DB_PASSWORD} ehub_pms | gzip > backups/backup_${DATE}.sql.gz
+
+# Keep last 30 days
+find backups/ -name "backup_*.sql.gz" -mtime +30 -delete
+```
+
+Add to cron:
+```bash
+0 2 * * * /path/to/backup-script.sh
+```
+
+### Troubleshooting
+
+#### Services Not Starting
+
+```bash
+# Check logs
+docker-compose logs
+
+# Verify environment variables
+docker-compose config
+
+# Check port conflicts
+netstat -tulpn | grep :3002
+```
+
+#### Database Connection Issues
+
+```bash
+# Test database connection
+docker-compose exec mysql mysql -u root -p
+
+# Verify database exists
+SHOW DATABASES;
+
+# Check user permissions
+SELECT User, Host FROM mysql.user;
+```
+
+#### High Memory Usage
+
+```bash
+# Check resource usage
+docker stats
+
+# Restart services
+docker-compose restart
+
+# Scale down if needed
+docker-compose up -d --scale backend=1
+```
+
+---
+
+## Default Login Credentials
+
+⚠️ **IMPORTANT**: Change these immediately after deployment!
+
+- **Admin**: `admin` / `admin123` or `admin@ehub.ph` / `admin123`
+- **Supervisor**: `supervisor` / `supervisor123` or `supervisor@ehub.ph` / `supervisor123`
+- **Fabricator**: `fabricator@ehub.com` / `admin123`
+
+---
+
+## Support & Documentation
+
+- **Issues**: Check logs with `docker-compose logs`
+- **Database Issues**: Verify connection with health check endpoint
+- **Performance**: Monitor with `docker stats` or use monitoring tools
+
+For detailed setup instructions, see:
+- [SETUP_GUIDE.md](./SETUP_GUIDE.md)
+- [LOCALHOST_SETUP.md](./LOCALHOST_SETUP.md)
+- [Guidelines.md](./guidelines/Guidelines.md)
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Start everything
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Restart service
+docker-compose restart [service]
+
+# Scale backend
+docker-compose up -d --scale backend=3
+
+# Stop everything
+docker-compose down
+
+# Backup database
+docker-compose exec mysql mysqldump -u root -p ehub_pms > backup.sql
+
+# Update and redeploy
+git pull
+docker-compose build --no-cache
+docker-compose up -d
+```

@@ -4,6 +4,7 @@ import { LogOut, Shield, Crown } from 'lucide-react';
 import { User } from '../../types';
 import { CompanyLogo } from '../ui/company-logo';
 import { ThemeToggle } from '../ui/theme-toggle';
+import { SidebarTrigger } from '../ui/sidebar';
 
 interface HeaderProps {
   currentUser: User;
@@ -45,6 +46,7 @@ export function Header({ currentUser, onLogout, currentTheme, onThemeChange, isT
   return (
     <header className="flex items-center justify-between px-6 py-3 bg-card border-b shadow-sm">
       <div className="flex items-center gap-4">
+        <SidebarTrigger />
         <CompanyLogo size="md" showText={true} clickable={true} />
       </div>
 

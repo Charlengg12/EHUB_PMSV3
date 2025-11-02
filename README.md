@@ -1,17 +1,41 @@
 # Ehub Project Management System
 
-A comprehensive project management system designed for fabricators, supervisors, and administrators. Built with React, TypeScript, Tailwind CSS, and Supabase.
+A comprehensive, scalable project management system designed for fabricators, supervisors, and administrators. Built with React, TypeScript, Node.js, Express, and MySQL.
 
 ## 🚀 Quick Start
 
-**For localhost development**: See [LOCALHOST_SETUP.md](./LOCALHOST_SETUP.md) for a simple guide to get started in minutes.
+### Option 1: Docker Deployment (Recommended)
+
+The fastest way to get started with full production-ready setup:
+
+```bash
+# Clone repository
+git clone <repository-url>
+cd EHUB_PMSV3
+
+# Configure environment
+cp env.production.template .env
+# Edit .env with your settings
+
+# Start all services
+docker-compose up -d
+
+# Access the application
+# Frontend: http://localhost
+# Backend API: http://localhost:3002/api
+```
+
+### Option 2: Local Development
+
+**For localhost development**: See [LOCALHOST_SETUP.md](./LOCALHOST_SETUP.md) for a simple guide.
 
 ```bash
 npm install
-npm run dev
+npm run setup      # Setup database
+npm run start:full  # Start both frontend and backend
 ```
 
-Then open http://localhost:3000
+Then open http://localhost:5173
 
 ## Features
 
@@ -41,11 +65,25 @@ Then open http://localhost:3000
 
 ## Tech Stack
 
-- **Frontend**: React 18, TypeScript, Tailwind CSS
-- **Backend**: Supabase (PostgreSQL, Edge Functions, Auth, Storage)
-- **UI Components**: Radix UI primitives with custom styling
-- **Build Tool**: Vite
-- **Deployment**: Can be deployed to Vercel, Netlify, or any static hosting
+### Frontend
+- **React 18** with TypeScript
+- **Tailwind CSS** for styling
+- **Radix UI** primitives with custom components
+- **Vite** for build tooling
+- **React Hook Form** for form management
+
+### Backend
+- **Node.js** with Express.js
+- **MySQL 8.0** database
+- **JWT** for authentication
+- **bcrypt** for password hashing
+- **Express Rate Limit** for security
+
+### Infrastructure
+- **Docker** & Docker Compose for containerization
+- **Nginx** reverse proxy and load balancing
+- **Redis** (optional) for caching and sessions
+- **Scalable architecture** supporting horizontal scaling
 
 ## Quick Start (Localhost)
 
@@ -141,30 +179,41 @@ The application can run locally without a Supabase backend connection. In this m
 - Enter email address to receive reset instructions
 - System sends credentials reminder and reset options
 
-## Deployment
+## 📚 Documentation
 
-### Build for Production
+### Quick Links
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Complete deployment guide (Docker, cloud platforms, VPS)
+- **[SCALING_GUIDE.md](./SCALING_GUIDE.md)** - Guide for scaling to handle increased load
+- **[Guidelines.md](./guidelines/Guidelines.md)** - Development guidelines and best practices
+- **[LOCALHOST_SETUP.md](./LOCALHOST_SETUP.md)** - Quick local development setup
+
+### Deployment Options
+
+#### 🐳 Docker (Recommended)
+Production-ready deployment with a single command:
 ```bash
-npm run build
+docker-compose up -d
 ```
+See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md#docker-deployment) for details.
 
-### Deploy to Vercel
-1. Push code to GitHub/GitLab
-2. Connect repository to Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy automatically on push
+#### ☁️ Cloud Platforms
+- **AWS EC2 + RDS**: Full guide in deployment docs
+- **DigitalOcean**: App Platform deployment
+- **Heroku**: Platform-as-a-Service option
+- **Azure/GCP**: Container-based deployment
 
-### Deploy to Netlify
-1. Build the project: `npm run build`
-2. Upload `dist` folder to Netlify
-3. Configure environment variables
-4. Set up continuous deployment
+#### 🖥️ Traditional VPS
+Deploy to any Linux server with Docker support. Full instructions in [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
 
-### Deploy to VPS/Server
-1. Build the project: `npm run build`
-2. Serve `dist` folder with nginx/apache
-3. Configure environment variables
-4. Set up SSL certificate
+### Scaling
+
+The application is designed for scalability:
+- **Horizontal Scaling**: Scale backend instances easily with Docker Compose
+- **Load Balancing**: Automatic load balancing via Nginx
+- **Database Optimization**: Connection pooling, indexing, read replicas support
+- **Caching**: Redis support for session storage and query caching
+
+See [SCALING_GUIDE.md](./SCALING_GUIDE.md) for detailed scaling strategies.
 
 ## Project Structure
 
@@ -187,16 +236,41 @@ npm run build
 
 ## API Endpoints
 
-The system uses Supabase Edge Functions for backend operations:
+RESTful API built with Express.js:
 
-- `POST /auth/login` - User authentication
-- `POST /auth/signup` - User registration  
-- `POST /forgot-password` - Password reset
-- `GET/POST /projects` - Project management
-- `GET/POST /tasks` - Task management
-- `GET/POST /worklogs` - Work log entries
-- `GET/POST /materials` - Materials tracking
-- `GET /users` - User management
+### Authentication
+- `POST /api/auth/login` - User authentication (supports admin, supervisor, and regular users)
+- `POST /api/auth/signup` - User registration (fabricators)
+- `POST /api/auth/forgot-password` - Password reset
+
+### Projects
+- `GET /api/projects` - List all projects
+- `POST /api/projects` - Create new project
+- `GET /api/projects/:id` - Get project details
+- `PUT /api/projects/:id` - Update project
+- `DELETE /api/projects/:id` - Delete project
+
+### Tasks
+- `GET /api/tasks` - List all tasks
+- `POST /api/tasks` - Create new task
+- `PUT /api/tasks/:id` - Update task
+- `DELETE /api/tasks/:id` - Delete task
+
+### Work Logs
+- `GET /api/worklogs` - List work logs
+- `POST /api/worklogs` - Create work log entry
+
+### Materials
+- `GET /api/materials` - List materials
+- `POST /api/materials` - Add material
+
+### Users
+- `GET /api/users` - List all users
+- `POST /api/users/client` - Create client user
+- `POST /api/users/supervisor` - Create supervisor user
+
+### Health
+- `GET /api/health` - Health check endpoint
 
 ## Contributing
 
@@ -219,11 +293,28 @@ For support and questions:
 
 ## Security
 
-- Never commit `.env.local` or other environment files
-- Keep Supabase service role keys secure
-- Use HTTPS in production
-- Regularly update dependencies
-- Follow security best practices for user data
+### Production Checklist
+- ✅ Change all default passwords immediately
+- ✅ Generate strong JWT secret (use `openssl rand -base64 32`)
+- ✅ Use strong database passwords (min 16 characters)
+- ✅ Enable HTTPS/SSL in production
+- ✅ Configure firewall rules
+- ✅ Enable rate limiting (configured in Nginx)
+- ✅ Set up security headers (configured in Nginx)
+- ✅ Regular security updates: `docker-compose pull`
+- ✅ Automated database backups
+- ✅ Never commit `.env` files to version control
+
+### Security Features
+- **Password Hashing**: bcrypt with salt rounds
+- **JWT Authentication**: Secure token-based auth with expiration
+- **SQL Injection Protection**: Parameterized queries
+- **XSS Protection**: Input sanitization
+- **CORS**: Configurable CORS policies
+- **Rate Limiting**: API endpoint protection
+- **Security Headers**: Comprehensive headers via Nginx
+
+See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md#security-checklist) for complete security checklist.
 
 ## Changelog
 

@@ -10,6 +10,7 @@ import { User } from '../../types';
 import { CompanyLogo } from '../ui/company-logo';
 import { RegistrationSuccessDialog } from './RegistrationSuccessDialog';
 import { apiService } from '../../utils/apiService';
+import { mapUserDataFromBackend } from '../../utils/userDataMapper';
 
 // Schools list for the dropdown
 const SCHOOLS = [
@@ -94,7 +95,9 @@ export function FabricatorSignupForm({ onSignup, onBackToMain }: FabricatorSignu
       });
 
       if (response.data) {
-        setRegisteredUser(response.data);
+        const rawUserData = response.data.user || response.data;
+        const userData = mapUserDataFromBackend(rawUserData);
+        setRegisteredUser(userData);
         setShowSuccessDialog(true);
       } else {
         throw new Error(response.error || 'Signup failed');

@@ -1,205 +1,211 @@
-# Deployment Checklist
+# Production Deployment Checklist
 
-Use this checklist when deploying Ehub Project Management to production.
+Use this checklist to ensure a successful and secure production deployment.
 
 ## Pre-Deployment
 
-### 1. Code Quality
-- [ ] Run `npm run lint` - No errors
-- [ ] Run `npm run build` - Builds successfully
-- [ ] Test all major features locally
-- [ ] Check browser console for errors
-- [ ] Test on multiple browsers (Chrome, Firefox, Safari, Edge)
-- [ ] Test responsive design on mobile devices
+### Code & Build
+- [ ] All tests passing
+- [ ] Code reviewed and approved
+- [ ] Build succeeds without errors (`npm run build`)
+- [ ] No console errors or warnings in production build
+- [ ] TypeScript compilation successful
+- [ ] ESLint passes with no errors
 
-### 2. Environment Configuration
-- [ ] Create `.env.local` file (DO NOT commit this)
-- [ ] Set `VITE_SUPABASE_URL` with your project URL
-- [ ] Set `VITE_SUPABASE_ANON_KEY` with your anon key
-- [ ] Set `SUPABASE_SERVICE_ROLE_KEY` (keep this secret!)
-- [ ] Set `SUPABASE_DB_URL` with your database URL
-- [ ] Verify all environment variables are correct
+### Environment Configuration
+- [ ] `.env` file created from `env.production.template`
+- [ ] All environment variables set and verified
+- [ ] Database credentials configured
+- [ ] JWT secret generated (use `openssl rand -base64 32`)
+- [ ] Strong database password set (min 16 characters)
+- [ ] Frontend URL configured
+- [ ] API URL configured
+- [ ] Email service configured (if using)
 
-### 3. Supabase Setup
-- [ ] Create Supabase project
-- [ ] Note your Project URL and API keys
-- [ ] Install Supabase CLI: `npm install -g supabase`
-- [ ] Login: `supabase login`
-- [ ] Link project: `supabase link --project-ref your-project-id`
-- [ ] Deploy edge functions: `supabase functions deploy`
-- [ ] Test edge functions are working
-- [ ] Configure storage buckets (if using file uploads)
-- [ ] Set up Row Level Security (RLS) policies
+### Security
+- [ ] All default passwords changed
+- [ ] JWT secret is strong and unique
+- [ ] Database password is strong
+- [ ] No sensitive data in code
+- [ ] `.env` file not committed to git
+- [ ] SSL certificates obtained (Let's Encrypt or commercial)
+- [ ] CORS origins configured correctly
+- [ ] Rate limiting enabled
+- [ ] Security headers configured
 
-### 4. Security Review
-- [ ] `.env.local` is in `.gitignore`
-- [ ] No hardcoded credentials in code
-- [ ] Service role key is only used server-side
-- [ ] All API routes are properly authenticated
-- [ ] CORS is configured correctly
-- [ ] Rate limiting is enabled (if applicable)
+### Database
+- [ ] Database server accessible
+- [ ] Database created (`ehub_pms`)
+- [ ] Database user created with appropriate permissions
+- [ ] Initial schema imported (`database/ehub_pms_deployment.sql`)
+- [ ] Database indexes created
+- [ ] Connection pooling configured
+- [ ] Backup strategy implemented
 
-## Deployment Options
+## Deployment
 
-### Option A: Vercel (Recommended)
+### Docker Deployment
+- [ ] Docker and Docker Compose installed
+- [ ] Docker images built successfully
+- [ ] Containers start without errors
+- [ ] All services healthy (check with `docker-compose ps`)
+- [ ] Health check endpoint responding (`/api/health`)
+- [ ] Frontend accessible
+- [ ] Backend API accessible
+- [ ] Database connection working
 
-1. **Prepare Repository**
-   - [ ] Push code to GitHub/GitLab/Bitbucket
-   - [ ] Ensure `.gitignore` includes `.env.local`
+### Network & Firewall
+- [ ] Firewall configured (ports 22, 80, 443 only)
+- [ ] Domain DNS configured
+- [ ] SSL certificate installed and valid
+- [ ] HTTPS redirect working
+- [ ] Port 3002 not publicly exposed (only via reverse proxy)
 
-2. **Deploy to Vercel**
-   - [ ] Go to [vercel.com](https://vercel.com) and login
-   - [ ] Click "New Project"
-   - [ ] Import your Git repository
-   - [ ] Configure build settings (Vite should be auto-detected)
-   - [ ] Add environment variables in Vercel dashboard
-   - [ ] Deploy!
+### Nginx Configuration (If using)
+- [ ] Nginx configuration validated (`nginx -t`)
+- [ ] Reverse proxy configured
+- [ ] SSL certificates installed
+- [ ] Security headers enabled
+- [ ] Rate limiting configured
+- [ ] Static asset caching configured
+- [ ] Gzip compression enabled
 
-3. **Post-Deployment**
-   - [ ] Test the live URL
-   - [ ] Verify database connections work
-   - [ ] Check that environment variables are loaded
-   - [ ] Test login functionality
-   - [ ] Create first admin user
-
-### Option B: Netlify
-
-1. **Build Locally**
-   - [ ] Run `npm run build`
-   - [ ] Verify `dist/` folder is created
-
-2. **Deploy to Netlify**
-   - [ ] Go to [netlify.com](https://netlify.com) and login
-   - [ ] Click "Add new site"
-   - [ ] Choose "Deploy manually" or connect Git
-   - [ ] Upload `dist` folder (if manual)
-   - [ ] Add environment variables in Netlify dashboard
-   - [ ] Configure build settings: `npm run build`
-   - [ ] Set publish directory: `dist`
-
-3. **Post-Deployment**
-   - [ ] Test the live URL
-   - [ ] Verify all features work
-   - [ ] Set up continuous deployment (optional)
-
-### Option C: VPS/Server
-
-1. **Prepare Server**
-   - [ ] Install Node.js 18+ on server
-   - [ ] Install nginx or apache
-   - [ ] Set up SSL certificate (Let's Encrypt)
-   - [ ] Configure firewall
-
-2. **Build and Upload**
-   - [ ] Run `npm run build` locally
-   - [ ] Upload `dist/` folder to server
-   - [ ] Configure web server to serve static files
-   - [ ] Set up environment variables on server
-
-3. **Web Server Configuration**
-   - [ ] Configure nginx/apache for SPA routing
-   - [ ] Enable gzip compression
-   - [ ] Set up caching headers
-   - [ ] Configure HTTPS redirect
-
-## Post-Deployment Verification
-
-### Functionality Tests
-- [ ] Login works correctly
-- [ ] User registration works
-- [ ] Project creation works
-- [ ] Task management works
-- [ ] File uploads work (if enabled)
-- [ ] Email notifications work (if configured)
-- [ ] All user roles function correctly
-- [ ] Database persistence works
-
-### Performance Tests
-- [ ] Page load time < 3 seconds
-- [ ] Images are optimized
+### Testing
+- [ ] Frontend loads correctly
+- [ ] Login functionality works
+- [ ] All user roles can log in
+- [ ] API endpoints responding
+- [ ] Database queries working
+- [ ] File uploads working (if applicable)
+- [ ] Email sending works (if configured)
+- [ ] No CORS errors
 - [ ] No console errors
-- [ ] Mobile performance is acceptable
-- [ ] All API calls complete successfully
 
-### Security Tests
-- [ ] No exposed API keys in browser
-- [ ] HTTPS is enforced
-- [ ] Authentication is required for protected routes
-- [ ] Session management works correctly
-- [ ] Password reset flow works
+## Post-Deployment
 
-## Production Configuration
+### Monitoring
+- [ ] Logging configured
+- [ ] Error tracking set up (Sentry, etc.)
+- [ ] Monitoring dashboard configured
+- [ ] Alerts configured for critical issues
+- [ ] Health checks monitoring active
 
-### Recommended Settings
+### Backup
+- [ ] Database backup automated
+- [ ] Backup tested (restore procedure verified)
+- [ ] Backup retention policy set
+- [ ] Off-site backup configured
 
-**Vercel/Netlify:**
-```bash
-Build Command: npm run build
-Output Directory: dist
-Node Version: 18.x or higher
-```
+### Documentation
+- [ ] Deployment documentation updated
+- [ ] Environment variables documented
+- [ ] Access credentials documented (securely)
+- [ ] Runbook created for common issues
 
-**Environment Variables Required:**
-```
-VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=xxxxx
-SUPABASE_SERVICE_ROLE_KEY=xxxxx (server-side only)
-SUPABASE_DB_URL=xxxxx (server-side only)
-```
+### Performance
+- [ ] Load testing completed
+- [ ] Response times acceptable (< 200ms API, < 2s page load)
+- [ ] Database query performance acceptable
+- [ ] Resource usage within limits
+- [ ] CDN configured (if applicable)
 
-## Troubleshooting
+### Security Audit
+- [ ] Security headers verified
+- [ ] HTTPS enforced
+- [ ] No exposed endpoints without authentication
+- [ ] Rate limiting working
+- [ ] SQL injection protection verified
+- [ ] XSS protection verified
+- [ ] Password requirements enforced
 
-### Build Fails
-- Check Node.js version (must be 18+)
-- Clear cache: `npm cache clean --force`
-- Delete `node_modules` and reinstall
-- Check for TypeScript errors: `npm run lint`
+## Production Readiness
 
-### Environment Variables Not Working
-- Ensure they're prefixed with `VITE_` for client-side
-- Restart dev server after adding env vars
-- Check spelling and formatting
-- Verify values don't have extra quotes or spaces
+### High Availability
+- [ ] Multiple backend instances (if needed)
+- [ ] Load balancing configured
+- [ ] Database replication (if needed)
+- [ ] Failover mechanisms in place
+- [ ] Graceful degradation handled
 
-### Database Connection Issues
-- Verify Supabase URL and keys are correct
-- Check Supabase project is active
-- Ensure edge functions are deployed
-- Check browser console for specific errors
+### Scaling Prepared
+- [ ] Horizontal scaling tested
+- [ ] Database scaling plan ready
+- [ ] Caching strategy implemented (if needed)
+- [ ] Auto-scaling rules defined (if applicable)
 
-### 404 Errors on Refresh
-- Configure hosting for SPA routing
-- Add redirect rules for all routes to index.html
-- Check Vercel/Netlify configuration
+### Maintenance
+- [ ] Update procedure documented
+- [ ] Rollback procedure documented
+- [ ] Maintenance window scheduled
+- [ ] Team trained on deployment process
 
-## Maintenance
+## User Acceptance
 
-### Regular Tasks
-- [ ] Monitor error logs
-- [ ] Update dependencies monthly: `npm update`
-- [ ] Review and rotate API keys quarterly
-- [ ] Backup database regularly
-- [ ] Monitor server resources
-- [ ] Review and update security settings
+### Functionality
+- [ ] All core features working
+- [ ] User roles and permissions correct
+- [ ] Data integrity verified
+- [ ] Performance acceptable
+- [ ] Mobile responsiveness verified
 
-### Updates
-- [ ] Test updates in staging first
-- [ ] Keep dependencies up to date
-- [ ] Monitor Supabase changelog
-- [ ] Review and apply security patches
+### User Testing
+- [ ] Admin can log in and manage users
+- [ ] Supervisor can log in and manage projects
+- [ ] Fabricator can log in and submit work logs
+- [ ] Client can view assigned projects
+- [ ] All workflows end-to-end tested
 
-## Rollback Plan
+## Sign-Off
 
-If deployment fails:
-1. Revert to previous Git commit
-2. Redeploy previous working version
-3. Check error logs for issues
-4. Fix issues in development
-5. Test thoroughly before redeploying
+### Team Approval
+- [ ] Development team approved
+- [ ] QA team approved
+- [ ] Security team approved (if applicable)
+- [ ] Operations team approved
+- [ ] Stakeholders notified
+
+### Go-Live
+- [ ] Backup taken before go-live
+- [ ] Team on standby for launch
+- [ ] Monitoring active
+- [ ] Communication plan ready
+- [ ] Rollback plan ready
 
 ---
 
-**Need Help?** Contact your development team or refer to:
-- [Vercel Documentation](https://vercel.com/docs)
-- [Netlify Documentation](https://docs.netlify.com)
-- [Supabase Documentation](https://supabase.com/docs)
+## Quick Deployment Command Reference
+
+```bash
+# Full deployment
+./deploy.sh update
+
+# Start services
+./deploy.sh start
+
+# Check status
+./deploy.sh status
+
+# View logs
+./deploy.sh logs
+
+# Backup database
+./deploy.sh backup
+
+# Scale backend
+docker-compose up -d --scale backend=3
+```
+
+---
+
+## Emergency Contacts
+
+- **DevOps**: [Contact Info]
+- **Database Admin**: [Contact Info]
+- **Security Team**: [Contact Info]
+- **On-Call Engineer**: [Contact Info]
+
+---
+
+**Last Updated**: [Date]
+**Deployed By**: [Name]
+**Deployment Date**: [Date]

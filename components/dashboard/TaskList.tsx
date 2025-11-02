@@ -25,28 +25,28 @@ export function TaskList({ tasks, projects, currentUser, onUpdateTaskStatus }: T
 
   const filteredTasks = getFilteredTasks().slice(0, 8);
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: Task['status']) => {
     switch (status) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'in-progress':
         return <Clock className="h-4 w-4 text-blue-500" />;
-      case 'review':
+      case 'blocked':
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       default:
         return <Clock className="h-4 w-4 text-gray-400" />;
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: Task['status']) => {
     switch (status) {
       case 'completed':
         return 'default';
       case 'in-progress':
         return 'secondary';
-      case 'review':
+      case 'blocked':
         return 'destructive';
-      case 'todo':
+      case 'pending':
         return 'outline';
       default:
         return 'outline';
@@ -83,14 +83,15 @@ export function TaskList({ tasks, projects, currentUser, onUpdateTaskStatus }: T
 
   const getNextStatus = (currentStatus: Task['status']): Task['status'] => {
     switch (currentStatus) {
-      case 'todo':
+      case 'pending':
         return 'in-progress';
       case 'in-progress':
-        return 'review';
-      case 'review':
         return 'completed';
+      case 'blocked':
+        return 'completed';
+      case 'completed':
       default:
-        return currentStatus;
+        return 'completed';
     }
   };
 
@@ -116,7 +117,10 @@ export function TaskList({ tasks, projects, currentUser, onUpdateTaskStatus }: T
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {getProjectName(task.projectId)} • Due: {new Date(task.dueDate).toLocaleDateString()}
+                    {getProjectName(task.projectId)} • Due:{" "}
+                    {task.dueDate
+                      ? new Date(task.dueDate).toLocaleDateString()
+                      : "No due date"}
                   </p>
                 </div>
               </div>
@@ -126,11 +130,13 @@ export function TaskList({ tasks, projects, currentUser, onUpdateTaskStatus }: T
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => onUpdateTaskStatus(task.id, getNextStatus(task.status))}
+                      onClick={() => {
+                        onUpdateTaskStatus(task.id, getNextStatus(task.status));
+                      }}
                     >
-                      {task.status === 'todo' && 'Start'}
-                      {task.status === 'in-progress' && 'Submit'}
-                      {task.status === 'review' && 'Complete'}
+                      {task.status === 'pending' && 'Start'}
+                      {task.status === 'in-progress' && 'Complete'}
+                      {task.status === 'blocked' && 'Complete'}
                     </Button>
                   )}
                   {canMarkAsDone(task) && (

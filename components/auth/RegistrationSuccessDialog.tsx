@@ -12,11 +12,11 @@ interface RegistrationSuccessDialogProps {
   onContinue: () => void;
 }
 
-export function RegistrationSuccessDialog({ 
-  isOpen, 
-  user, 
-  onClose, 
-  onContinue 
+export function RegistrationSuccessDialog({
+  isOpen,
+  user,
+  onClose,
+  onContinue
 }: RegistrationSuccessDialogProps) {
   const [countdown, setCountdown] = useState(10);
   const [isCopied, setIsCopied] = useState(false);
@@ -57,8 +57,8 @@ export function RegistrationSuccessDialog({
   if (!user) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="max-w-md" hideCloseButton>
+    <Dialog open={isOpen} onOpenChange={() => { }}>
+      <DialogContent className="max-w-md">
         <DialogHeader className="text-center space-y-4">
           <div className="flex items-center justify-center">
             <div className="rounded-full bg-green-100 p-3">
@@ -78,7 +78,7 @@ export function RegistrationSuccessDialog({
               <User className="h-5 w-5 text-muted-foreground" />
               <span className="font-medium">Account Details</span>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Name:</span>
@@ -105,7 +105,7 @@ export function RegistrationSuccessDialog({
                 Use this ID to login to your account
               </p>
             </div>
-            
+
             <div className="flex items-center justify-center gap-2">
               <div className="bg-background border rounded-md px-4 py-2 font-mono text-lg font-bold text-primary">
                 {user.secureId}
@@ -125,7 +125,7 @@ export function RegistrationSuccessDialog({
           {/* Important Notice */}
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
             <p className="text-sm text-orange-800">
-              <strong>Important:</strong> Please save your Login ID ({user.secureId}) in a secure place. 
+              <strong>Important:</strong> Please save your Login ID ({user.secureId}) in a secure place.
               You'll need it to access your account.
             </p>
           </div>
@@ -135,16 +135,16 @@ export function RegistrationSuccessDialog({
             <p className="text-sm text-muted-foreground">
               Automatically continuing in {countdown} seconds...
             </p>
-            
+
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={onClose}
                 className="flex-1"
               >
                 Close
               </Button>
-              <Button 
+              <Button
                 onClick={onContinue}
                 className="flex-1"
               >
