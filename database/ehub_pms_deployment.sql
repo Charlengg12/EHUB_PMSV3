@@ -3,8 +3,8 @@
 -- Created: 2024
 
 -- Create database
-CREATE DATABASE IF NOT EXISTS `ehub_pms` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `ehub_pms`;
+CREATE DATABASE IF NOT EXISTS `ehubph_pms` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `ehubph_pms`;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS `users` (

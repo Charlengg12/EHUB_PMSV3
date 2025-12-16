@@ -1,9 +1,6 @@
-// API Service for MySQL/Express backend
-// Prefer configured URL; otherwise infer host so mobile devices on the same LAN can reach the API
-const inferredHost = (typeof window !== 'undefined' && window.location && window.location.hostname)
-  ? window.location.hostname
-  : 'localhost';
-const API_BASE_URL = process.env.REACT_APP_API_URL || `http://${inferredHost}:3002/api`;
+// API Service for PHP backend (cPanel/shared hosting friendly)
+// Use VITE_API_URL when provided, otherwise default to same-origin `/api`
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface ApiResponse<T> {
     data?: T;

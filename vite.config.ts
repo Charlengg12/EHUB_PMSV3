@@ -17,9 +17,6 @@ export default defineConfig(({ mode }) => {
     define: {
       // Make environment variables available at build time
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
-      // Ensure import.meta.env is properly populated
-      __VITE_SUPABASE_URL__: JSON.stringify(env.VITE_SUPABASE_URL),
-      __VITE_SUPABASE_ANON_KEY__: JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
     },
     build: {
       outDir: 'dist',
@@ -29,7 +26,6 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             vendor: ['react', 'react-dom'],
             ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
-            supabase: ['@supabase/supabase-js'],
           },
         },
       },
@@ -42,6 +38,6 @@ export default defineConfig(({ mode }) => {
       port: 4173,
       host: true,
     },
-    envPrefix: ['VITE_', 'SUPABASE_'],
+    envPrefix: ['VITE_'],
   };
 });
