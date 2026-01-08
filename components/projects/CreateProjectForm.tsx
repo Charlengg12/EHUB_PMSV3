@@ -35,7 +35,8 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClose
     supervisorAllocation: '',
     companyAllocation: '',
     totalProjectPrice: '',
-    supervisorAssignsFabricators: false, // New toggle state
+    supervisorAssignsFabricators: false,
+    broadcastToSupervisors: false, // New toggle state
     documentationUrl: ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -71,11 +72,11 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClose
       newErrors.description = 'Project description is required';
     }
 
-    if (!formData.supervisorId) {
-      newErrors.supervisorId = 'Supervisor selection is required';
+    if (!formData.supervisorId && !formData.broadcastToSupervisors) {
+      newErrors.supervisorId = 'Supervisor selection is required unless broadcasting to all';
     }
 
-    if (!formData.supervisorAssignsFabricators && formData.fabricatorIds.length === 0) {
+    if (!formData.supervisorAssignsFabricators && !formData.broadcastToSupervisors && formData.fabricatorIds.length === 0) {
       newErrors.fabricatorIds = 'At least one fabricator must be assigned or supervisor must assign manually';
     }
 
@@ -143,6 +144,8 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClose
       createdBy: currentUser.id,
       createdAt: new Date().toISOString(),
       fabricatorBudgets: [],
+      // @ts-ignore - Adding extra property handled by backend
+      broadcastToSupervisors: formData.broadcastToSupervisors
     };
 
     await onCreateProject(newProject);
@@ -302,6 +305,34 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClose
                 {errors.supervisorId && <p className="text-sm text-destructive">{errors.supervisorId}</p>}
               </div>
 
+              {/* Broadcast to all supervisors toggle */}
+              <div className="flex items-center space-x-2">
+                <input
+                  id="broadcastToSupervisors"
+                  type="checkbox"
+                  checked={formData.broadcastToSupervisors}
+                  onChange={(e) => {
+                    handleInputChange('broadcastToSupervisors', e.target.checked);
+                    // If broadcasting, we might clear specific supervisor or keep it as preferred?
+                    // Let's keep it simply separate.
+                    if (e.target.checked) {
+                      handleInputChange('supervisorId', '');
+                    }
+                  }}
+                  className="cursor-pointer h-4 w-4"
+                />
+                <Label htmlFor="broadcastToSupervisors" className="cursor-pointer font-medium">
+                  Send to all active supervisors
+                </Label>
+              </div>
+              {formData.broadcastToSupervisors && (
+                <Alert>
+                  <AlertDescription>
+                    All supervisors will be notified. The first to accept will be assigned.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Supervisor assigns fabricators manually toggle */}
               <div className="flex items-center space-x-2">
                 <input
@@ -323,8 +354,8 @@ export function CreateProjectForm({ currentUser, users, onCreateProject, onClose
                 </Alert>
               )}
 
-              {/* Fabricators selection disabled if supervisor assigns manually */}
-              {!formData.supervisorAssignsFabricators && (
+              {/* Fabricators selection disabled if supervisor assigns manually or broadcasting */}
+              {!formData.supervisorAssignsFabricators && !formData.broadcastToSupervisors && (
                 <div className="space-y-2">
                   <Label>Fabricators *</Label>
                   <Select onValueChange={handleAddFabricator}>

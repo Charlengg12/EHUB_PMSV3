@@ -7,8 +7,19 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Archive, Calendar, DollarSign, Download, Eye, FileText, GraduationCap, User, Building } from 'lucide-react';
+import { Archive, Calendar, DollarSign, Download, Eye, FileText, GraduationCap, User, Building, Trash2, Edit } from 'lucide-react';
 import { Project, User as UserType, Material, WorkLogEntry } from '../../types';
+import { ProjectDetails } from '../projects/ProjectDetails';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../ui/alert-dialog';
 
 interface ProjectArchivesProps {
   projects: Project[];
@@ -16,27 +27,34 @@ interface ProjectArchivesProps {
   materials: Material[];
   workLogs: WorkLogEntry[];
   currentUser: UserType;
+  onUpdateProject?: (project: Project) => void;
+  onDeleteProject?: (projectId: string) => void;
 }
 
-export function ProjectArchives({ 
-  projects, 
-  users, 
-  materials, 
-  workLogs, 
-  currentUser 
+export function ProjectArchives({
+  projects,
+  users,
+  materials,
+  workLogs,
+  currentUser,
+  onUpdateProject,
+  onDeleteProject
 }: ProjectArchivesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSchool, setSelectedSchool] = useState('all');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   // Get completed projects only
   const completedProjects = projects.filter(project => project.status === 'completed');
 
   // Get unique schools from completed projects
   const schools = Array.from(new Set(
-    completedProjects.map(project => 
-      users.find(u => u.role === 'client' && u.clientProjectId === project.id)?.school || 
+    completedProjects.map(project =>
+      users.find(u => u.role === 'client' && u.clientProjectId === project.id)?.school ||
       project.clientName
     )
   )).sort();
@@ -44,13 +62,13 @@ export function ProjectArchives({
   // Filter projects based on search and school
   const filteredProjects = completedProjects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.clientName.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const projectSchool = users.find(u => u.role === 'client' && u.clientProjectId === project.id)?.school || 
-                         project.clientName;
+      project.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      project.clientName.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const projectSchool = users.find(u => u.role === 'client' && u.clientProjectId === project.id)?.school ||
+      project.clientName;
     const matchesSchool = selectedSchool === 'all' || projectSchool === selectedSchool;
-    
+
     return matchesSearch && matchesSchool;
   });
 
@@ -72,14 +90,14 @@ export function ProjectArchives({
   };
 
   const getFabricatorDocumentation = (project: Project) => {
-    return project.attachments?.filter(att => 
+    return project.attachments?.filter(att =>
       project.fabricatorIds.some(fabId => att.uploadedBy === fabId)
     ) || [];
   };
 
   const getCostAnalysisDocuments = (project: Project) => {
-    return project.attachments?.filter(att => 
-      att.name.toLowerCase().includes('cost') || 
+    return project.attachments?.filter(att =>
+      att.name.toLowerCase().includes('cost') ||
       att.name.toLowerCase().includes('analysis') ||
       att.name.toLowerCase().includes('budget') ||
       att.type.includes('spreadsheet')
@@ -260,6 +278,33 @@ export function ProjectArchives({
                         Documentation
                       </Button>
                     )}
+                    {(currentUser.role === 'admin' || currentUser.role === 'supervisor') && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProject(project);
+                            setShowEditDialog(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            setProjectToDelete(project);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -275,7 +320,7 @@ export function ProjectArchives({
               <Archive className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg mb-2">No Archived Projects Found</h3>
               <p className="text-muted-foreground">
-                {searchTerm || selectedSchool !== 'all' 
+                {searchTerm || selectedSchool !== 'all'
                   ? 'Try adjusting your search filters.'
                   : 'No completed projects available in the archives yet.'
                 }
@@ -294,7 +339,7 @@ export function ProjectArchives({
               Completed project details and documentation
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedProject && (
             <div className="space-y-6">
               <Tabs defaultValue="overview" className="w-full">
@@ -314,8 +359,8 @@ export function ProjectArchives({
                     <div>
                       <Label>Client/School</Label>
                       <p className="text-sm mt-1">
-                        {users.find(u => u.role === 'client' && u.clientProjectId === selectedProject.id)?.school || 
-                         selectedProject.clientName}
+                        {users.find(u => u.role === 'client' && u.clientProjectId === selectedProject.id)?.school ||
+                          selectedProject.clientName}
                       </p>
                     </div>
                     <div>
@@ -433,7 +478,7 @@ export function ProjectArchives({
                           {selectedProject.fabricatorBudgets?.map(budget => {
                             const fabricator = users.find(u => u.id === budget.fabricatorId);
                             const utilizationRate = (budget.spentAmount / budget.allocatedAmount) * 100;
-                            
+
                             return (
                               <div key={budget.fabricatorId} className="p-4 border rounded-lg">
                                 <div className="flex justify-between items-start mb-2">
@@ -520,7 +565,7 @@ export function ProjectArchives({
                           const fabricator = users.find(u => u.id === fabricatorId);
                           const workLogs = getProjectWorkLogs(selectedProject.id).filter(log => log.fabricatorId === fabricatorId);
                           const totalHours = workLogs.reduce((sum, log) => sum + log.hoursWorked, 0);
-                          
+
                           return fabricator ? (
                             <div key={fabricatorId} className="p-4 border rounded-lg">
                               <div className="flex items-center gap-3 mb-2">
@@ -550,6 +595,50 @@ export function ProjectArchives({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog (using ProjectDetails component) */}
+      {showEditDialog && selectedProject && (
+        <ProjectDetails
+          project={selectedProject}
+          users={users}
+          currentUser={currentUser}
+          onUpdateProject={(updated) => {
+            if (onUpdateProject) onUpdateProject(updated);
+            setSelectedProject(updated);
+          }}
+          onClose={() => {
+            setShowEditDialog(false);
+            setSelectedProject(null);
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Archived Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{projectToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProjectToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (projectToDelete && onDeleteProject) {
+                  onDeleteProject(projectToDelete.id);
+                }
+                setDeleteDialogOpen(false);
+                setProjectToDelete(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

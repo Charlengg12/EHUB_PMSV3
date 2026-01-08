@@ -47,6 +47,7 @@ export interface Project {
   createdBy: string; // Who created the project
   createdAt: string;
   pendingAssignments?: ProjectAssignment[]; // Pending fabricator assignments
+  pendingSupervisors?: string[]; // Pending supervisor assignments (for broadcasting)
 }
 
 export interface ProjectAssignment {

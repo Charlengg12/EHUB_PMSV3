@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS `projects` (
   `client_id` VARCHAR(255) DEFAULT NULL,
   `supervisor_id` VARCHAR(255) DEFAULT NULL,
   `fabricator_ids` JSON DEFAULT NULL,
+  `pending_supervisors` JSON DEFAULT NULL,
   `pending_assignments` JSON DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

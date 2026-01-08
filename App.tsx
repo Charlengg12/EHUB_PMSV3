@@ -61,10 +61,10 @@ export default function App() {
             // Default to dashboard for signed-in users
             if (storedUser) {
               setCurrentView('dashboard');
-              try { window.location.hash = 'dashboard'; } catch {}
+              try { window.location.hash = 'dashboard'; } catch { }
             }
           }
-        } catch {}
+        } catch { }
 
         // Check if backend is available
         const healthCheck = await apiService.healthCheck();
@@ -107,7 +107,7 @@ export default function App() {
       setCurrentView('dashboard');
       try {
         window.location.hash = 'dashboard';
-      } catch {}
+      } catch { }
     }
   }, [currentUser, currentView]);
 
@@ -147,11 +147,11 @@ export default function App() {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    try { localStorage.setItem('currentUser', JSON.stringify(user)); } catch {}
+    try { localStorage.setItem('currentUser', JSON.stringify(user)); } catch { }
     setCurrentView('dashboard');
     try {
       window.location.hash = 'dashboard';
-    } catch {}
+    } catch { }
   };
 
   const handleLogout = () => {
@@ -159,10 +159,10 @@ export default function App() {
     setCurrentUser(null);
     setCurrentView('dashboard');
     setAuthView('main');
-    try { localStorage.removeItem('currentUser'); } catch {}
+    try { localStorage.removeItem('currentUser'); } catch { }
     try {
       window.location.hash = 'dashboard';
-    } catch {}
+    } catch { }
   };
 
   const handleSignup = (newUser: User) => {
@@ -170,7 +170,7 @@ export default function App() {
     setUsers(prevUsers => [...prevUsers, newUser]);
     // Log them in immediately
     setCurrentUser(newUser);
-    try { localStorage.setItem('currentUser', JSON.stringify(newUser)); } catch {}
+    try { localStorage.setItem('currentUser', JSON.stringify(newUser)); } catch { }
     setCurrentView('dashboard');
   };
 
@@ -275,46 +275,93 @@ export default function App() {
     setMaterials(prevMaterials => [...prevMaterials, newMaterial]);
   };
 
-  const handleAcceptAssignment = (assignmentId: string, response?: string) => {
-    setProjects(prevProjects =>
-      prevProjects.map(project => ({
-        ...project,
-        pendingAssignments: project.pendingAssignments?.map(assignment =>
-          assignment.id === assignmentId
-            ? {
-              ...assignment,
-              status: 'accepted' as const,
-              response,
-              respondedAt: new Date().toISOString()
-            }
-            : assignment
-        ),
-        fabricatorIds: project.pendingAssignments?.find(a => a.id === assignmentId && a.status === 'pending')
-          ? [...project.fabricatorIds, project.pendingAssignments.find(a => a.id === assignmentId)!.fabricatorId]
-          : project.fabricatorIds,
-        status: project.pendingAssignments?.find(a => a.id === assignmentId && a.status === 'pending')
-          ? 'planning' as const
-          : project.status
-      }))
-    );
+  const handleAcceptAssignment = async (assignmentId: string, response?: string, projectId?: string) => {
+    // If projectId is provided, it might be a supervisor accepting a project
+    const targetProjectId = projectId || (assignmentId ? projects.find(p => p.pendingAssignments?.some(a => a.id === assignmentId))?.id : null);
+
+    if (!targetProjectId) return;
+
+    try {
+      await apiService.respondToAssignment(targetProjectId, 'accepted', assignmentId || undefined);
+
+      // Update local state
+      setProjects(prevProjects =>
+        prevProjects.map(project => {
+          if (project.id !== targetProjectId) return project;
+
+          // Supervisor acceptance
+          if (currentUser?.role === 'supervisor' && project.pendingSupervisors?.includes(currentUser.id)) {
+            return {
+              ...project,
+              supervisorId: currentUser.id,
+              pendingSupervisors: project.pendingSupervisors.filter(id => id !== currentUser.id),
+              status: 'planning' // or strictly mapped status
+            };
+          }
+
+          // Fabricator acceptance
+          return {
+            ...project,
+            pendingAssignments: project.pendingAssignments?.map(assignment =>
+              assignment.id === assignmentId
+                ? {
+                  ...assignment,
+                  status: 'accepted' as const,
+                  response,
+                  respondedAt: new Date().toISOString()
+                }
+                : assignment
+            ),
+            fabricatorIds: project.pendingAssignments?.find(a => a.id === assignmentId && a.status === 'pending')
+              ? [...project.fabricatorIds, project.pendingAssignments.find(a => a.id === assignmentId)!.fabricatorId]
+              : project.fabricatorIds,
+            status: project.pendingAssignments?.find(a => a.id === assignmentId && a.status === 'pending')
+              ? 'planning' as const // Or 'in-progress' logic
+              : project.status
+          };
+        })
+      );
+    } catch (error) {
+      console.error("Failed to accept assignment", error);
+    }
   };
 
-  const handleDeclineAssignment = (assignmentId: string, response?: string) => {
-    setProjects(prevProjects =>
-      prevProjects.map(project => ({
-        ...project,
-        pendingAssignments: project.pendingAssignments?.map(assignment =>
-          assignment.id === assignmentId
-            ? {
-              ...assignment,
-              status: 'declined' as const,
-              response,
-              respondedAt: new Date().toISOString()
-            }
-            : assignment
-        )
-      }))
-    );
+  const handleDeclineAssignment = async (assignmentId: string, response?: string, projectId?: string) => {
+    const targetProjectId = projectId || (assignmentId ? projects.find(p => p.pendingAssignments?.some(a => a.id === assignmentId))?.id : null);
+    if (!targetProjectId) return;
+
+    try {
+      await apiService.respondToAssignment(targetProjectId, 'declined', assignmentId || undefined);
+
+      setProjects(prevProjects =>
+        prevProjects.map(project => {
+          if (project.id !== targetProjectId) return project;
+
+          if (currentUser?.role === 'supervisor' && project.pendingSupervisors?.includes(currentUser.id)) {
+            return {
+              ...project,
+              pendingSupervisors: project.pendingSupervisors.filter(id => id !== currentUser.id)
+            };
+          }
+
+          return {
+            ...project,
+            pendingAssignments: project.pendingAssignments?.map(assignment =>
+              assignment.id === assignmentId
+                ? {
+                  ...assignment,
+                  status: 'declined' as const,
+                  response,
+                  respondedAt: new Date().toISOString()
+                }
+                : assignment
+            )
+          };
+        })
+      );
+    } catch (error) {
+      console.error("Failed to decline assignment", error);
+    }
   };
 
   const handleAssignFabricator = (projectId: string, fabricatorId: string, message?: string) => {
@@ -388,6 +435,25 @@ export default function App() {
     setTasks(prevTasks => [...prevTasks, ...newTasks]);
   };
 
+  const handleBroadcastFabricators = async (projectId: string, message?: string) => {
+    try {
+      const response = await apiService.broadcastToFabricators(projectId, message);
+      if (response.data?.assignments) {
+        // Update project with new pending assignments
+        setProjects(prev => prev.map(p =>
+          p.id === projectId
+            ? { ...p, pendingAssignments: response.data.assignments, status: 'pending-assignment' }
+            : p
+        ));
+        // Email notifications could be triggered here or by backend. 
+        // Backend is cleaner for "broadcast" but emailService is client-side mock mostly.
+        // We'll skip client-side email loop for broadcast to avoid spamming from browser.
+      }
+    } catch (error) {
+      console.error("Broadcast failed", error);
+    }
+  };
+
   const handleUpdateProject = async (updatedProject: Project) => {
     // Optimistic update for responsiveness
     setProjects(prevProjects =>
@@ -449,23 +515,23 @@ export default function App() {
       if (rawHash === 'admin-projects' || rawHash === 'admin-tasks') {
         window.location.hash = 'projects';
         setCurrentView('projects');
-        try { localStorage.setItem('currentView', 'projects'); } catch {}
+        try { localStorage.setItem('currentView', 'projects'); } catch { }
         return;
       }
       // Redirect fabricators from assignments to projects
       if (rawHash === 'assignments' && currentUser?.role === 'fabricator') {
         window.location.hash = 'projects';
         setCurrentView('projects');
-        try { localStorage.setItem('currentView', 'projects'); } catch {}
+        try { localStorage.setItem('currentView', 'projects'); } catch { }
         return;
       }
       if (validViews.includes(rawHash as typeof validViews[number])) {
         setCurrentView(rawHash as ViewType);
-        try { localStorage.setItem('currentView', rawHash); } catch {}
+        try { localStorage.setItem('currentView', rawHash); } catch { }
       } else if (!rawHash) {
         // Default to dashboard when no hash is present
         setCurrentView('dashboard');
-        try { localStorage.setItem('currentView', 'dashboard'); } catch {}
+        try { localStorage.setItem('currentView', 'dashboard'); } catch { }
       }
     };
 
@@ -496,9 +562,9 @@ export default function App() {
             ? storedView
             : 'dashboard';
           setCurrentView(view as ViewType);
-          if (!rawHash) { try { window.location.hash = view; } catch {} }
+          if (!rawHash) { try { window.location.hash = view; } catch { } }
         }
-      } catch {}
+      } catch { }
     }
 
     return () => {
@@ -518,7 +584,7 @@ export default function App() {
         setBackendHealthy(prev => {
           // Transition from unhealthy -> healthy: reload data
           if (prev === false && healthy) {
-            loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => {});
+            loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => { });
           }
           return healthy;
         });
@@ -540,7 +606,7 @@ export default function App() {
       if (document.visibilityState === 'visible' && backendHealthy) {
         // Avoid excessive reloads: only if >10s since last reload
         if (Date.now() - lastReloadAt > 10000) {
-          loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => {});
+          loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => { });
         }
       }
     };
@@ -551,7 +617,7 @@ export default function App() {
         const healthy = !res.error;
         setBackendHealthy(healthy);
         if (healthy) {
-          loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => {});
+          loadDataFromDatabase().then(() => setLastReloadAt(Date.now())).catch(() => { });
         }
       }, 1000);
     };
@@ -652,9 +718,10 @@ export default function App() {
             onCreateProject={(currentUser.role === 'admin' || currentUser.role === 'supervisor') ? handleCreateProject : undefined}
             onAssignFabricator={currentUser.role === 'supervisor' ? handleAssignFabricator : undefined}
             onUpdateProject={handleUpdateProject}
-            onAcceptAssignment={currentUser.role === 'fabricator' ? handleAcceptAssignment : undefined}
-            onDeclineAssignment={currentUser.role === 'fabricator' ? handleDeclineAssignment : undefined}
+            onAcceptAssignment={handleAcceptAssignment}
+            onDeclineAssignment={handleDeclineAssignment}
             onCreateUser={handleAddUser}
+            onBroadcastFabricators={currentUser.role === 'supervisor' ? handleBroadcastFabricators : undefined}
           />
         );
 
@@ -775,6 +842,31 @@ export default function App() {
             tasks={tasks}
             currentUser={currentUser}
           />
+        );
+
+      case 'archives':
+        if (currentUser.role === 'admin' || currentUser.role === 'supervisor') {
+          return (
+            <ProjectArchives
+              projects={projects}
+              users={users}
+              materials={materials}
+              workLogs={workLogs}
+              currentUser={currentUser}
+              onUpdateProject={handleUpdateProject}
+              onDeleteProject={handleDeleteProject}
+            />
+          );
+        }
+        return (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <h3 className="text-lg mb-2">Access Restricted</h3>
+              <p className="text-muted-foreground">
+                Archives are only available for admins and supervisors.
+              </p>
+            </div>
+          </div>
         );
 
       case 'users':

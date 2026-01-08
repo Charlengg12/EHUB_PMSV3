@@ -209,6 +209,25 @@ class ApiService {
     async healthCheck(): Promise<ApiResponse<any>> {
         return this.request('/health');
     }
+
+    // Assignment Broadcast & Response
+    async broadcastToFabricators(projectId: string, message?: string): Promise<ApiResponse<any>> {
+        return this.request('/projects/broadcast-fabricators', {
+            method: 'POST',
+            body: JSON.stringify({ projectId, message }),
+        });
+    }
+
+    async respondToAssignment(
+        projectId: string,
+        response: 'accepted' | 'declined',
+        assignmentId?: string
+    ): Promise<ApiResponse<any>> {
+        return this.request('/projects/respond-assignment', {
+            method: 'POST',
+            body: JSON.stringify({ projectId, response, assignmentId }),
+        });
+    }
 }
 
 export const apiService = new ApiService();

@@ -16,8 +16,8 @@ export const mockWorkLogs: WorkLogEntry[] = [];
 export const mockMaterials: Material[] = [];
 
 // Company revenue data - replace with your own
-export const mockCompanyRevenue: CompanyRevenue = {
+export const mockCompanyRevenue: CompanyRevenue[] = [{
   totalRevenue: 0,
   monthlyRevenue: [],
   yearlyRevenue: []
-};
+}];

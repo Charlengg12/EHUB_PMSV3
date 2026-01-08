@@ -21,12 +21,13 @@ interface ProjectsGridProps {
   onCreateProject?: (project: Omit<Project, 'id'>) => void | Promise<void> | Promise<Project>;
   onAssignFabricator?: (projectId: string, fabricatorId: string, message?: string) => void;
   onUpdateProject?: (project: Project) => void;
-  onAcceptAssignment?: (assignmentId: string, response?: string) => void;
-  onDeclineAssignment?: (assignmentId: string, response?: string) => void;
+  onAcceptAssignment?: (assignmentId: string, response?: string, projectId?: string) => void;
+  onDeclineAssignment?: (assignmentId: string, response?: string, projectId?: string) => void;
   onCreateUser?: (user: User) => void;
+  onBroadcastFabricators?: (projectId: string, message?: string) => void;
 }
 
-export function ProjectsGrid({ projects, users, currentUser, onCreateProject, onAssignFabricator, onUpdateProject, onAcceptAssignment, onDeclineAssignment, onCreateUser }: ProjectsGridProps) {
+export function ProjectsGrid({ projects, users, currentUser, onCreateProject, onAssignFabricator, onUpdateProject, onAcceptAssignment, onDeclineAssignment, onCreateUser, onBroadcastFabricators }: ProjectsGridProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -48,12 +49,15 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
     if (currentUser.role === 'admin') {
       roleFilteredProjects = projects;
     } else if (currentUser.role === 'supervisor') {
-      roleFilteredProjects = projects.filter(p => p.supervisorId === currentUser.id);
+      roleFilteredProjects = projects.filter(p =>
+        p.supervisorId === currentUser.id ||
+        (p.pendingSupervisors && p.pendingSupervisors.includes(currentUser.id))
+      );
     } else if (currentUser.role === 'fabricator') {
       // For fabricators, show both assigned projects and pending assignments
-      roleFilteredProjects = projects.filter(p => 
+      roleFilteredProjects = projects.filter(p =>
         p.fabricatorIds.includes(currentUser.id) ||
-        p.pendingAssignments?.some(assignment => 
+        p.pendingAssignments?.some(assignment =>
           assignment.fabricatorId === currentUser.id && assignment.status === 'pending'
         )
       );
@@ -416,164 +420,198 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                 </div>
               </div>
 
+              {/* Pending Supervisor Assignment Banner */}
+              {currentUser.role === 'supervisor' && project.pendingSupervisors?.includes(currentUser.id) && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-300 dark:border-blue-700 rounded-lg p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="font-semibold text-blue-900 dark:text-blue-100">
+                      Pending Project Assignment
+                    </span>
+                  </div>
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    You have been invited to supervise this project.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => onAcceptAssignment && onAcceptAssignment('', 'accepted', project.id)}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Accept Project
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                      onClick={() => onDeclineAssignment && onDeclineAssignment('', 'declined', project.id)}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Pending Assignment Banner for Fabricators */}
               {currentUser.role === 'fabricator' && project.pendingAssignments?.some(
                 assignment => assignment.fabricatorId === currentUser.id && assignment.status === 'pending'
               ) && !project.fabricatorIds.includes(currentUser.id) && (
-                <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-lg p-4 space-y-3 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <span className="font-semibold text-orange-900 dark:text-orange-100">
-                      New Project Assignment
-                    </span>
-                  </div>
-                  {project.pendingAssignments
-                    .filter(a => a.fabricatorId === currentUser.id && a.status === 'pending')
-                    .map(assignment => {
-                      const supervisor = users.find(u => u.id === assignment.assignedBy);
-                      const isAcceptMode = selectedAssignment === `accept-${assignment.id}`;
-                      const isDeclineMode = selectedAssignment === assignment.id && !selectedAssignment?.includes('accept-');
-                      
-                      return (
-                        <div key={assignment.id} className="space-y-3">
-                          {assignment.message && (
-                            <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-orange-200 dark:border-orange-800">
-                              <div className="flex items-start gap-2 text-sm">
-                                <MessageSquare className="h-4 w-4 mt-0.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                                <div>
-                                  <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">
-                                    Message from Supervisor:
-                                  </p>
-                                  <p className="text-orange-800 dark:text-orange-200">{assignment.message}</p>
+                  <div className="bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 rounded-lg p-4 space-y-3 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      <span className="font-semibold text-orange-900 dark:text-orange-100">
+                        New Project Assignment
+                      </span>
+                    </div>
+                    {project.pendingAssignments
+                      .filter(a => a.fabricatorId === currentUser.id && a.status === 'pending')
+                      .map(assignment => {
+                        const supervisor = users.find(u => u.id === assignment.assignedBy);
+                        const isAcceptMode = selectedAssignment === `accept-${assignment.id}`;
+                        const isDeclineMode = selectedAssignment === assignment.id && !selectedAssignment?.includes('accept-');
+
+                        return (
+                          <div key={assignment.id} className="space-y-3">
+                            {assignment.message && (
+                              <div className="bg-white dark:bg-gray-800 rounded-md p-3 border border-orange-200 dark:border-orange-800">
+                                <div className="flex items-start gap-2 text-sm">
+                                  <MessageSquare className="h-4 w-4 mt-0.5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                                  <div>
+                                    <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">
+                                      Message from Supervisor:
+                                    </p>
+                                    <p className="text-orange-800 dark:text-orange-200">{assignment.message}</p>
+                                  </div>
                                 </div>
                               </div>
+                            )}
+                            <div className="text-xs text-orange-700 dark:text-orange-300 flex items-center gap-2">
+                              <Users className="h-3 w-3" />
+                              <span>Assigned by: <strong>{supervisor?.name || 'Unknown Supervisor'}</strong></span>
                             </div>
-                          )}
-                          <div className="text-xs text-orange-700 dark:text-orange-300 flex items-center gap-2">
-                            <Users className="h-3 w-3" />
-                            <span>Assigned by: <strong>{supervisor?.name || 'Unknown Supervisor'}</strong></span>
-                          </div>
-                          
-                          {/* Action Buttons - Show when no mode is selected */}
-                          {!isAcceptMode && !isDeclineMode && (
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                                onClick={() => {
-                                  setSelectedAssignment(`accept-${assignment.id}`);
-                                  setAssignmentResponse('');
-                                }}
-                              >
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                Accept Assignment
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-400"
-                                onClick={() => {
-                                  setSelectedAssignment(assignment.id);
-                                  setAssignmentResponse('');
-                                }}
-                              >
-                                <XCircle className="h-4 w-4 mr-2" />
-                                Decline Assignment
-                              </Button>
-                            </div>
-                          )}
 
-                          {/* Accept with Response */}
-                          {isAcceptMode && (
-                            <div className="space-y-3 bg-green-50 dark:bg-green-900/10 rounded-md p-3 border border-green-200 dark:border-green-800">
-                              <Label className="text-sm font-medium text-green-900 dark:text-green-100">
-                                Accept Assignment
-                              </Label>
-                              <Textarea
-                                value={assignmentResponse}
-                                onChange={(e) => setAssignmentResponse(e.target.value)}
-                                placeholder="Add an optional message to the supervisor..."
-                                className="text-sm"
-                                rows={3}
-                              />
+                            {/* Action Buttons - Show when no mode is selected */}
+                            {!isAcceptMode && !isDeclineMode && (
                               <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() => {
-                                    setSelectedAssignment(null);
-                                    setAssignmentResponse('');
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
                                 <Button
                                   size="sm"
                                   className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                                   onClick={() => {
-                                    if (onAcceptAssignment) {
-                                      onAcceptAssignment(assignment.id, assignmentResponse.trim() || undefined);
-                                      setSelectedAssignment(null);
-                                      setAssignmentResponse('');
-                                    }
-                                  }}
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  Confirm Accept
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Decline with Response */}
-                          {isDeclineMode && (
-                            <div className="space-y-3 bg-red-50 dark:bg-red-900/10 rounded-md p-3 border border-red-200 dark:border-red-800">
-                              <Label className="text-sm font-medium text-red-900 dark:text-red-100">
-                                Decline Assignment
-                              </Label>
-                              <Textarea
-                                value={assignmentResponse}
-                                onChange={(e) => setAssignmentResponse(e.target.value)}
-                                placeholder="Add an optional reason for declining..."
-                                className="text-sm"
-                                rows={3}
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1"
-                                  onClick={() => {
-                                    setSelectedAssignment(null);
+                                    setSelectedAssignment(`accept-${assignment.id}`);
                                     setAssignmentResponse('');
                                   }}
                                 >
-                                  Cancel
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  Accept Assignment
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="destructive"
-                                  className="flex-1"
+                                  variant="outline"
+                                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-400"
                                   onClick={() => {
-                                    if (onDeclineAssignment) {
-                                      onDeclineAssignment(assignment.id, assignmentResponse.trim() || undefined);
-                                      setSelectedAssignment(null);
-                                      setAssignmentResponse('');
-                                    }
+                                    setSelectedAssignment(assignment.id);
+                                    setAssignmentResponse('');
                                   }}
                                 >
                                   <XCircle className="h-4 w-4 mr-2" />
-                                  Confirm Decline
+                                  Decline Assignment
                                 </Button>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
+                            )}
+
+                            {/* Accept with Response */}
+                            {isAcceptMode && (
+                              <div className="space-y-3 bg-green-50 dark:bg-green-900/10 rounded-md p-3 border border-green-200 dark:border-green-800">
+                                <Label className="text-sm font-medium text-green-900 dark:text-green-100">
+                                  Accept Assignment
+                                </Label>
+                                <Textarea
+                                  value={assignmentResponse}
+                                  onChange={(e) => setAssignmentResponse(e.target.value)}
+                                  placeholder="Add an optional message to the supervisor..."
+                                  className="text-sm"
+                                  rows={3}
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => {
+                                      setSelectedAssignment(null);
+                                      setAssignmentResponse('');
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={() => {
+                                      if (onAcceptAssignment) {
+                                        onAcceptAssignment(assignment.id, assignmentResponse.trim() || undefined);
+                                        setSelectedAssignment(null);
+                                        setAssignmentResponse('');
+                                      }
+                                    }}
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    Confirm Accept
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Decline with Response */}
+                            {isDeclineMode && (
+                              <div className="space-y-3 bg-red-50 dark:bg-red-900/10 rounded-md p-3 border border-red-200 dark:border-red-800">
+                                <Label className="text-sm font-medium text-red-900 dark:text-red-100">
+                                  Decline Assignment
+                                </Label>
+                                <Textarea
+                                  value={assignmentResponse}
+                                  onChange={(e) => setAssignmentResponse(e.target.value)}
+                                  placeholder="Add an optional reason for declining..."
+                                  className="text-sm"
+                                  rows={3}
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1"
+                                    onClick={() => {
+                                      setSelectedAssignment(null);
+                                      setAssignmentResponse('');
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="flex-1"
+                                    onClick={() => {
+                                      if (onDeclineAssignment) {
+                                        onDeclineAssignment(assignment.id, assignmentResponse.trim() || undefined);
+                                        setSelectedAssignment(null);
+                                        setAssignmentResponse('');
+                                      }
+                                    }}
+                                  >
+                                    <XCircle className="h-4 w-4 mr-2" />
+                                    Confirm Decline
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
 
               <div className="flex gap-2 flex-wrap">
                 <Button
@@ -621,17 +659,27 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                     </Button>
                   )}
                 {currentUser.role === 'supervisor' && project.supervisorId === currentUser.id && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedProjectId(project.id);
-                      setShowAssignForm(true);
-                    }}
-                  >
-                    <UserPlus className="h-3 w-3 mr-1" />
-                    Assign
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedProjectId(project.id);
+                        setShowAssignForm(true);
+                      }}
+                    >
+                      <UserPlus className="h-3 w-3 mr-1" />
+                      Assign
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onBroadcastFabricators && onBroadcastFabricators(project.id)}
+                    >
+                      <Users className="h-3 w-3 mr-1" />
+                      Send to All Fabricators
+                    </Button>
+                  </>
                 )}
                 {/* Workflow Actions */}
                 {currentUser.role === 'admin' && project.status === '0_Created' && (
