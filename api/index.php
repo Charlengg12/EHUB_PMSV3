@@ -416,11 +416,18 @@ function handle_login(PDO $pdo): void
         json_response(['error' => 'Identifier and password are required'], 400);
     }
 
-    // Try to match by email, secure_id or employee_number
-    $stmt = $pdo->prepare(
-        'SELECT * FROM users WHERE (secure_id = :id OR employee_number = :id OR email = :id) AND is_active = 1 LIMIT 1'
-    );
-    $stmt->execute([':id' => $identifier]);
+    // Try to match by email, secure_id, employee_number, or id
+    // Also handle 'admin' shorthand mapping to the admin user
+    $searchId = $identifier;
+    if (strtolower($identifier) === 'admin') {
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE role = "admin" AND is_active = 1 LIMIT 1');
+        $stmt->execute();
+    } else {
+        $stmt = $pdo->prepare(
+            'SELECT * FROM users WHERE (id = :id OR secure_id = :id OR employee_number = :id OR email = :id) AND is_active = 1 LIMIT 1'
+        );
+        $stmt->execute([':id' => $searchId]);
+    }
     $user = $stmt->fetch();
 
     if (!$user) {

@@ -24,7 +24,7 @@ import {
   generateSecureId,
   generateEmployeeNumber,
 } from "../../utils/secureId";
-import { apiService } from "../../utils/apiService";
+// import { apiService } from "../../utils/apiService";
 
 interface SupervisorSignupFormProps {
   onSignup: (user: User) => void;
@@ -116,6 +116,7 @@ export function SupervisorSignupForm({
         name: formData.name,
         email: formData.email.toLowerCase(),
         role: "supervisor",
+        department: formData.department,
         school: formData.department,
         secureId: generateSecureId('supervisor'),
         employeeNumber: generateEmployeeNumber(),

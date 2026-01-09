@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
-import { Calendar, DollarSign, Users, Building, FileText, Link, Paperclip, Plus, UserPlus, CheckCircle, Clock, XCircle, MessageSquare } from 'lucide-react';
+import { Calendar, DollarSign, Users, Building, FileText, Link, Paperclip, Plus, UserPlus, CheckCircle, Clock, XCircle, MessageSquare, Eye } from 'lucide-react';
 import { Project, User } from '../../types';
 import { CreateProjectForm } from './CreateProjectForm';
 import { ProjectDetails } from './ProjectDetails';
@@ -27,7 +27,19 @@ interface ProjectsGridProps {
   onBroadcastFabricators?: (projectId: string, message?: string) => void;
 }
 
-export function ProjectsGrid({ projects, users, currentUser, onCreateProject, onAssignFabricator, onUpdateProject, onAcceptAssignment, onDeclineAssignment, onCreateUser, onBroadcastFabricators }: ProjectsGridProps) {
+export function ProjectsGrid({
+  projects = [],
+  users = [],
+  currentUser,
+  onCreateProject,
+  onAssignFabricator,
+  onUpdateProject,
+  onAcceptAssignment,
+  onDeclineAssignment,
+  onCreateUser,
+  onBroadcastFabricators
+}: ProjectsGridProps) {
+  // Move all hooks to the top - this is required by React Hooks rules
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showAssignForm, setShowAssignForm] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -42,6 +54,8 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
   // For fabricator assignment responses
   const [selectedAssignment, setSelectedAssignment] = useState<string | null>(null);
   const [assignmentResponse, setAssignmentResponse] = useState('');
+
+  if (!currentUser) return null; // Safety check
 
   const getFilteredProjects = () => {
     // First filter by role-based access
@@ -178,7 +192,7 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
     }
   };
 
-  const handleMarkProjectAsDone = (project: Project) => {
+  const _handleMarkProjectAsDone = (project: Project) => {
     if (onUpdateProject) {
       const updatedProject = {
         ...project,
@@ -613,14 +627,15 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                   </div>
                 )}
 
-              <div className="flex gap-2 flex-wrap">
+              <div className="grid grid-cols-2 lg:flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="w-full lg:flex-1"
                   onClick={() => handleViewDetails(project)}
                 >
-                  View Details
+                  <Eye className="h-3 w-3 mr-1" />
+                  <span className="truncate">Details</span>
                 </Button>
                 {(currentUser.role === 'admin' || currentUser.role === 'supervisor') && (
                   isClientAssigned(project) ? (
@@ -628,67 +643,62 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                       variant="outline"
                       size="sm"
                       disabled
+                      className="w-full lg:flex-1"
                       title="Client already assigned to this project"
                     >
                       <CheckCircle className="h-3 w-3 mr-1" />
-                      Client Assigned
+                      <span className="truncate">Assigned</span>
                     </Button>
                   ) : (
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full lg:flex-1 text-primary"
                       onClick={() => {
                         setClientDialogProject(project);
                         setShowClientDialog(true);
                       }}
                     >
                       <UserPlus className="h-3 w-3 mr-1" />
-                      Create Client
+                      <span className="truncate">Client</span>
                     </Button>
                   )
                 )}
-                {(currentUser.role === 'admin' ||
-                  (currentUser.role === 'supervisor' && project.supervisorId === currentUser.id) ||
-                  (currentUser.role === 'fabricator' && project.createdBy === currentUser.id)) && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleViewDetails(project)}
-                    >
-                      Edit
-                    </Button>
-                  )}
                 {currentUser.role === 'supervisor' && project.supervisorId === currentUser.id && (
                   <>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full lg:flex-1 text-accent"
                       onClick={() => {
                         setSelectedProjectId(project.id);
                         setShowAssignForm(true);
                       }}
                     >
                       <UserPlus className="h-3 w-3 mr-1" />
-                      Assign
+                      <span className="truncate">Assign</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full lg:flex-1 col-span-2 lg:col-auto"
                       onClick={() => onBroadcastFabricators && onBroadcastFabricators(project.id)}
                     >
                       <Users className="h-3 w-3 mr-1" />
-                      Send to All Fabricators
+                      <span className="truncate">Broadcast FABs</span>
                     </Button>
                   </>
                 )}
-                {/* Workflow Actions */}
+
+                {/* Workflow Actions - Primary buttons should be prominent */}
                 {currentUser.role === 'admin' && project.status === '0_Created' && (
                   <Button
                     variant="default"
                     size="sm"
+                    className="w-full lg:flex-1 col-span-2 lg:col-auto bg-primary"
                     onClick={() => handleTransition(project, '1_Assigned_to_FAB')}
                   >
-                    Assign Project
+                    Assign Now
                   </Button>
                 )}
 
@@ -696,11 +706,11 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                   <Button
                     variant="default"
                     size="sm"
+                    className="w-full lg:flex-1 col-span-2 lg:col-auto bg-primary"
                     onClick={() => handleTransition(project, '2_Ready_for_Supervisor_Review')}
                     disabled={!(project.documentationUrl || (project.attachments && project.attachments.length > 0))}
-                    title={!(project.documentationUrl || (project.attachments && project.attachments.length > 0)) ? 'Add documentation or files first' : ''}
                   >
-                    Submit Work for Review
+                    Submit Review
                   </Button>
                 )}
 
@@ -709,16 +719,18 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                     <Button
                       variant="default"
                       size="sm"
+                      className="w-full lg:flex-1 bg-green-600 hover:bg-green-700"
                       onClick={() => handleTransition(project, '3_Ready_for_Admin_Review')}
                     >
-                      Approve Work
+                      Approve
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full lg:flex-1 text-destructive border-destructive/20"
                       onClick={() => handleTransition(project, '1_Assigned_to_FAB')}
                     >
-                      Reject Work
+                      Reject
                     </Button>
                   </>
                 )}
@@ -727,10 +739,10 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
                   <Button
                     variant="default"
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700"
+                    className="w-full lg:flex-1 col-span-2 lg:col-auto bg-green-600 hover:bg-green-700"
                     onClick={() => handleTransition(project, '4_Ready_for_Client_Signoff')}
                   >
-                    Approve Final
+                    Final Approval
                   </Button>
                 )}
               </div>
@@ -770,7 +782,6 @@ export function ProjectsGrid({ projects, users, currentUser, onCreateProject, on
           onCreateProject={async (project) => {
             await handleCreateProject(project);
           }}
-          onClientCreated={onCreateUser || (() => { })}
           onClose={() => setShowCreateForm(false)}
         />
       )}

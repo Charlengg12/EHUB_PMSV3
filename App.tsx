@@ -7,7 +7,7 @@ import { DashboardStats } from './components/dashboard/DashboardStats';
 import { ProjectOverview } from './components/dashboard/ProjectOverview';
 import { TaskList } from './components/dashboard/TaskList';
 import { ProjectsGrid } from './components/projects/ProjectsGrid';
-import { ProjectAssignments } from './components/projects/ProjectAssignments';
+// import { ProjectAssignments } from './components/projects/ProjectAssignments';
 import { UserManagement } from './components/users/UserManagement';
 import { RevenueOverview } from './components/revenue/RevenueOverview';
 import { WorkLogManager } from './components/worklog/WorkLogManager';
@@ -16,8 +16,8 @@ import { TaskManager } from './components/tasks/TaskManager';
 import { ReportsManager } from './components/reports/ReportsManager';
 import { ProjectArchives } from './components/archives/ProjectArchives';
 import { ClientDashboard } from './components/client/ClientDashboard';
-import { AdminProjectsManager } from './components/admin/AdminProjectsManager';
-import { AdminTasksManager } from './components/admin/AdminTasksManager';
+// import { AdminProjectsManager } from './components/admin/AdminProjectsManager';
+// import { AdminTasksManager } from './components/admin/AdminTasksManager';
 import { User, Task, Project, WorkLogEntry, Material, ProjectAssignment } from './types';
 import { mockUsers, mockProjects, mockTasks, mockCompanyRevenue, mockWorkLogs, mockMaterials } from './data/mockData';
 import { mapProjectsFromBackend } from './utils/projectDataMapper';
@@ -38,12 +38,12 @@ export default function App() {
   const [projects, setProjects] = useState(mockProjects);
   const [workLogs, setWorkLogs] = useState(mockWorkLogs);
   const [materials, setMaterials] = useState(mockMaterials);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [_isInitialized, _setIsInitialized] = useState(false);
   const [backendHealthy, setBackendHealthy] = useState<boolean | null>(null);
   const [lastReloadAt, setLastReloadAt] = useState<number>(0);
 
   // Initialize time-based theme
-  const { isDark, isTransitioning, setTheme, getCurrentTheme } = useTimeBasedTheme();
+  const { isDark: _isDark, isTransitioning, setTheme, getCurrentTheme } = useTimeBasedTheme();
 
   // Initialize: restore session and view, then database and data
   useEffect(() => {
@@ -71,19 +71,19 @@ export default function App() {
         if (healthCheck.error) {
           console.warn('Backend not available. Running in demo mode with local data.');
           setBackendHealthy(false);
-          setIsInitialized(true);
+          _setIsInitialized(true);
           return;
         }
 
         // Load data from database
         await loadDataFromDatabase();
         setBackendHealthy(true);
-        setIsInitialized(true);
+        _setIsInitialized(true);
       } catch (error) {
         console.error('Failed to initialize app:', error);
         console.warn('Falling back to demo mode with local data.');
         setBackendHealthy(false);
-        setIsInitialized(true); // Continue with local data
+        _setIsInitialized(true); // Continue with local data
       }
     };
 
@@ -109,7 +109,7 @@ export default function App() {
         window.location.hash = 'dashboard';
       } catch { }
     }
-  }, [currentUser, currentView]);
+  }, [currentUser?.role, currentView]);
 
   const loadDataFromDatabase = async () => {
     try {
@@ -759,8 +759,8 @@ export default function App() {
               projects={projects}
               users={users}
               currentUser={currentUser}
-              onCreateProject={(currentUser.role === 'admin' || currentUser.role === 'supervisor') ? handleCreateProject : undefined}
-              onAssignFabricator={currentUser.role === 'supervisor' ? handleAssignFabricator : undefined}
+              onCreateProject={undefined}
+              onAssignFabricator={undefined}
               onUpdateProject={handleUpdateProject}
               onAcceptAssignment={handleAcceptAssignment}
               onDeclineAssignment={handleDeclineAssignment}
@@ -855,6 +855,7 @@ export default function App() {
               currentUser={currentUser}
               onUpdateProject={handleUpdateProject}
               onDeleteProject={handleDeleteProject}
+              onCreateProject={handleCreateProject}
             />
           );
         }

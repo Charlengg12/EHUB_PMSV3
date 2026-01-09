@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { UserPlus, Mail, Phone, Shield, Eye, EyeOff, Edit, Trash2, Save, X } from 'lucide-react';
+import { UserPlus, Mail, Phone, Shield, Eye, EyeOff, /* Edit, Trash2, */ Save, X } from 'lucide-react';
 import { SupervisorSignupForm } from '../auth/SupervisorSignupForm';
 import { User } from '../../types';
 

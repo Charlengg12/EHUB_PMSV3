@@ -61,7 +61,7 @@ export function AdminLoginForm({
         onLogin(response.data.user);
       } else {
         // If API fails, try demo mode as fallback
-        if (formData.username === "admin" && formData.password === "admin123") {
+        if (formData.username === "admin" && formData.password === "password123") {
           const demoAdminUser = mockUsers.find(user => user.role === 'admin');
           if (demoAdminUser) {
             onLogin(demoAdminUser);
@@ -72,7 +72,7 @@ export function AdminLoginForm({
       }
     } catch (err) {
       // If API is completely unavailable, try demo mode
-      if (formData.username === "admin" && formData.password === "admin123") {
+      if (formData.username === "admin" && formData.password === "password123") {
         const demoAdminUser = mockUsers.find(user => user.role === 'admin');
         if (demoAdminUser) {
           onLogin(demoAdminUser);

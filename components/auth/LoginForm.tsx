@@ -52,7 +52,7 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
         onLogin(userData);
       } else {
         // If API fails, try demo mode as fallback
-        if (formData.identifier.toLowerCase() === 'admin' && formData.password === 'admin123') {
+        if (formData.identifier.toLowerCase() === 'admin' && formData.password === 'password123') {
           const demoAdminUser = {
             id: 'admin-1',
             name: 'Demo Administrator',
@@ -70,7 +70,7 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
           onLogin(demoAdminUser);
           return;
         }
-        if (formData.identifier.toLowerCase() === 'supervisor' && formData.password === 'supervisor123') {
+        if (formData.identifier.toLowerCase() === 'supervisor' && formData.password === 'password123') {
           const demoSupervisorUser = {
             id: 'supervisor-1',
             name: 'Demo Supervisor',
@@ -92,7 +92,7 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
       }
     } catch (err) {
       // If API is completely unavailable, try demo mode
-      if (formData.identifier.toLowerCase() === 'admin' && formData.password === 'admin123') {
+      if (formData.identifier.toLowerCase() === 'admin' && formData.password === 'password123') {
         const demoAdminUser = {
           id: 'admin-1',
           name: 'Demo Administrator',
@@ -110,7 +110,7 @@ export function LoginForm({ onLogin, onShowSignup, onShowForgotPassword }: Login
         onLogin(demoAdminUser);
         return;
       }
-      if (formData.identifier.toLowerCase() === 'supervisor' && formData.password === 'supervisor123') {
+      if (formData.identifier.toLowerCase() === 'supervisor' && formData.password === 'password123') {
         const demoSupervisorUser = {
           id: 'supervisor-1',
           name: 'Demo Supervisor',

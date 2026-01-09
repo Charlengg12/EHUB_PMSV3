@@ -6,19 +6,19 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { Separator } from '../ui/separator';
+// import { Separator } from '../ui/separator';
 import { 
   Package, 
   Plus, 
   Search,
-  Filter,
+  // Filter,
   DollarSign,
   Truck,
   CheckCircle,
   AlertCircle,
   XCircle,
-  Edit,
-  Trash2
+  // Edit,
+  // Trash2
 } from 'lucide-react';
 import { Material, User, Project } from '../../types';
 
@@ -27,7 +27,8 @@ interface MaterialsManagerProps {
   projects: Project[];
   materials: Material[];
   onAddMaterial: (material: Omit<Material, 'id' | 'addedAt'>) => void;
-  onUpdateMaterial?: (id: string, material: Partial<Material>) => void;
+  _onUpdateMaterial?: (id: string, material: Partial<Material>) => void;
+  _onDeleteMaterial?: (id: string) => void;
   onDeleteMaterial?: (id: string) => void;
 }
 
@@ -36,8 +37,8 @@ export function MaterialsManager({
   projects, 
   materials,
   onAddMaterial,
-  onUpdateMaterial,
-  onDeleteMaterial
+  _onUpdateMaterial,
+  _onDeleteMaterial
 }: MaterialsManagerProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedProject, setSelectedProject] = useState('');

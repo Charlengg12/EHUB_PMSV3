@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { CreateProjectForm } from '../projects/CreateProjectForm';
 
 interface ProjectArchivesProps {
   projects: Project[];
@@ -29,6 +30,7 @@ interface ProjectArchivesProps {
   currentUser: UserType;
   onUpdateProject?: (project: Project) => void;
   onDeleteProject?: (projectId: string) => void;
+  onCreateProject?: (projectData: any) => Promise<any>;
 }
 
 export function ProjectArchives({
@@ -38,7 +40,8 @@ export function ProjectArchives({
   workLogs,
   currentUser,
   onUpdateProject,
-  onDeleteProject
+  onDeleteProject,
+  onCreateProject
 }: ProjectArchivesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSchool, setSelectedSchool] = useState('all');
@@ -47,6 +50,7 @@ export function ProjectArchives({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   // Get completed projects only
   const completedProjects = projects.filter(project => project.status === 'completed');
@@ -118,9 +122,17 @@ export function ProjectArchives({
             Completed projects with documentation and cost analysis
           </p>
         </div>
-        <Badge variant="secondary" className="text-sm">
-          {filteredProjects.length} Archived Projects
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="secondary" className="text-sm">
+            {filteredProjects.length} Archived Projects
+          </Badge>
+          {(currentUser.role === 'admin' || currentUser.role === 'supervisor') && (
+            <Button size="sm" onClick={() => setShowCreateDialog(true)}>
+              <Archive className="h-4 w-4 mr-2" />
+              Add Record
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -259,23 +271,25 @@ export function ProjectArchives({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-2 pt-2 border-t">
+                  <div className="grid grid-cols-2 lg:flex gap-2 pt-2 border-t">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full lg:flex-1"
                       onClick={() => handleViewDetails(project)}
                     >
                       <Eye className="h-4 w-4 mr-2" />
-                      View Details
+                      <span className="truncate">Details</span>
                     </Button>
                     {project.documentationUrl && (
                       <Button
                         variant="outline"
                         size="sm"
+                        className="w-full lg:flex-1"
                         onClick={() => window.open(project.documentationUrl, '_blank')}
                       >
                         <Download className="h-4 w-4 mr-2" />
-                        Documentation
+                        <span className="truncate">Docs</span>
                       </Button>
                     )}
                     {(currentUser.role === 'admin' || currentUser.role === 'supervisor') && (
@@ -283,25 +297,26 @@ export function ProjectArchives({
                         <Button
                           variant="outline"
                           size="sm"
+                          className="w-full lg:flex-1 text-primary"
                           onClick={() => {
                             setSelectedProject(project);
                             setShowEditDialog(true);
                           }}
                         >
                           <Edit className="h-4 w-4 mr-2" />
-                          Edit
+                          <span className="truncate">Edit</span>
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-destructive hover:text-destructive"
+                          className="w-full lg:flex-1 text-destructive hover:text-destructive"
                           onClick={() => {
                             setProjectToDelete(project);
                             setDeleteDialogOpen(true);
                           }}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
+                          <span className="truncate">Delete</span>
                         </Button>
                       </>
                     )}
@@ -614,6 +629,30 @@ export function ProjectArchives({
       )}
 
       {/* Delete Confirmation */}
+      {/* Create Archive Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Archived Project</DialogTitle>
+            <DialogDescription>
+              Create a new historical project record for the archives.
+            </DialogDescription>
+          </DialogHeader>
+          <CreateProjectForm
+            users={users}
+            currentUser={currentUser}
+            onSubmit={async (data) => {
+              if (onCreateProject) {
+                // Ensure status is completed for archive
+                await onCreateProject({ ...data, status: 'completed', progress: 100 });
+                setShowCreateDialog(false);
+              }
+            }}
+            onCancel={() => setShowCreateDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

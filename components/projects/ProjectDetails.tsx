@@ -18,7 +18,12 @@ import {
   ExternalLink,
   Edit,
   Save,
-  X
+  X,
+  FileText as FileIcon,
+  Link as LinkIcon,
+  Archive as ArchiveIcon,
+  Users as UsersIcon,
+  DollarSign as RevenueIcon
 } from 'lucide-react';
 import { Project, User, ProjectAttachment } from '../../types';
 import { ProjectFileUpload } from './ProjectFileUpload';
@@ -258,12 +263,27 @@ export function ProjectDetails({
 
         <CardContent>
           <Tabs defaultValue='overview' className='w-full'>
-            <TabsList className='grid w-full grid-cols-5'>
-              <TabsTrigger value='overview'>Overview</TabsTrigger>
-              <TabsTrigger value='team'>Team</TabsTrigger>
-              <TabsTrigger value='revenue'>Revenue</TabsTrigger>
-              <TabsTrigger value='files'>Files</TabsTrigger>
-              <TabsTrigger value='documentation'>Documentation</TabsTrigger>
+            <TabsList className='flex w-full overflow-x-auto justify-start md:grid md:grid-cols-5 h-auto p-1 bg-muted/50'>
+              <TabsTrigger value='overview' className="flex-1 min-w-[80px]">
+                <FileIcon className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value='team' className="flex-1 min-w-[80px]">
+                <UsersIcon className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Team</span>
+              </TabsTrigger>
+              <TabsTrigger value='revenue' className="flex-1 min-w-[80px]">
+                <RevenueIcon className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Revenue</span>
+              </TabsTrigger>
+              <TabsTrigger value='files' className="flex-1 min-w-[80px]">
+                <FileIcon className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Files</span>
+              </TabsTrigger>
+              <TabsTrigger value='documentation' className="flex-1 min-w-[80px]">
+                <LinkIcon className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Docs</span>
+              </TabsTrigger>
             </TabsList>
 
             {/* Overview Tab */}

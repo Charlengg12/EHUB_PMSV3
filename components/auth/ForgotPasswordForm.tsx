@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Alert, AlertDescription } from '../ui/alert';
 import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import { CompanyLogo } from '../ui/company-logo';
-import { apiService } from '../../utils/apiService';
+// import { apiService } from '../../utils/apiService';
 
 interface ForgotPasswordFormProps {
   onBackToLogin: () => void;
